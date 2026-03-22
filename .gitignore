@@ -16,6 +16,9 @@ build/
 # Claude
 .claude/.tmp/
 
+# Environment
+.env
+
 # IDE
 .idea/
 .vscode/

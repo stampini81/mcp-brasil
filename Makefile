@@ -1,7 +1,7 @@
 # mcp-brasil — Makefile
 
 .DEFAULT_GOAL := help
-.PHONY: help sync dev test test-feature lint ruff fix types run serve inspect ci clean
+.PHONY: help sync dev test test-feature lint fix types run serve inspect ci clean
 
 ## —— Setup ——
 
@@ -19,7 +19,7 @@ dev: ## Install all dependencies (prod + dev)
 lint: ## Run lint + format check
 	uv run ruff check src/ tests/ && uv run ruff format --check src/ tests/
 
-ruff: ## Auto-fix lint + format
+fix: ## Auto-fix lint + format
 	uv run ruff check --fix src/ tests/ && uv run ruff format src/ tests/
 
 types: ## Run mypy strict type checking
@@ -36,13 +36,13 @@ ci: lint types test ## Full CI pipeline: lint + types + test
 ## —— Server ——
 
 run: ## Run MCP server (stdio)
-	uv run fastmcp run mcp_brasil.server:mcp
+	uv run python -m mcp_brasil.server
 
 serve: ## Run MCP server (HTTP :8000)
-	uv run fastmcp run mcp_brasil.server:mcp --transport http --port 8000
+	uv run python -c "from mcp_brasil.server import mcp; mcp.run(transport='streamable-http', host='0.0.0.0', port=8000)"
 
-inspect: ## Inspect MCP server (list tools, resources, prompts)
-	uv run fastmcp inspect mcp_brasil.server:mcp
+inspect: ## Inspect MCP server tools/resources/prompts
+	uv run python -c "from mcp_brasil.server import mcp, registry; print(registry.summary())"
 
 ## —— Misc ——
 
