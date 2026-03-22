@@ -51,6 +51,29 @@
 - [ ] **E-Cidadania tools not implemented** — Plan includes 9 web-scraping tools for e-Cidadania. Deferred to future sessions.
 - [ ] **dados_abertos auxiliary tools not implemented** — Plan includes 4 additional tools. Deferred to future sessions.
 
+## DataJud Feature
+
+- [x] **Elasticsearch POST API** — DataJud uses POST with JSON body (not GET). Client uses `httpx.AsyncClient.post()` directly instead of shared `http_get()`. Rate limited at 30 req/min.
+- [ ] **API key required** — Feature requires `DATAJUD_API_KEY` env var. Auto-discovery skips the feature if not set. Registration: https://datajud.cnj.jus.br
+- [ ] **Elasticsearch query DSL limited** — Current implementation uses basic `match` queries. Advanced features (bool queries, range filters, aggregations) not yet implemented.
+- [ ] **No pagination (offset/from)** — DataJud Elasticsearch supports `from` parameter for pagination. Current implementation only uses `size`. Tools could benefit from pagination support.
+
+## TSE Feature
+
+- [x] **REST API without CORS** — TSE DivulgaCandContas API blocks browser requests but works fine with httpx. No auth required.
+- [x] **Nested response shapes** — Candidatos endpoint wraps results in `{"candidatos": [...]}`, cargos in `{"cargos": [...]}`. Handled by extracting nested fields.
+- [ ] **API is unofficial** — DivulgaCandContas API is reverse-engineered. No official documentation. Endpoints may change without notice.
+- [ ] **No result totalization** — TSE API returns election results (votos) but `buscar_candidato` only shows `descricaoTotalizacao`. A dedicated tool for election results could be added.
+
+## Jurisprudência Feature
+
+- [x] **REST APIs for STF/STJ/TST** — Implemented using httpx GET requests to court search APIs. Browser automation (Playwright) not needed.
+- [ ] **API response shapes unverified against real data** — STF/STJ/TST APIs are reverse-engineered from web UIs. Real response formats may differ from what parsers expect. Graceful fallback returns empty lists on errors.
+- [ ] **STJ SCON may return HTML** — STJ's search endpoint (`pesquisar.jsp`) may return HTML instead of JSON depending on parameters. Current implementation assumes JSON; needs real API validation.
+- [ ] **TST backend API undocumented** — TST jurisprudence backend endpoint may not accept the parameters currently used. Needs real API testing.
+- [ ] **Súmulas search limited to STF** — Only STF súmulas are implemented. STJ and TST súmula APIs need investigation.
+- [ ] **No informativo-specific endpoint** — `buscar_informativos` currently delegates to the main search with "informativo" as query. A dedicated informativo API would give better results.
+
 ## Known Limitations
 
 - [x] **No CONTRIBUTING.md** — Resolvido. CONTRIBUTING.md criado com getting started, estrutura, como adicionar features, convenções, testes e PR guidelines.
