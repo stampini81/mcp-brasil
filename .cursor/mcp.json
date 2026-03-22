@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "mcp-brasil": {
-      "command": "uv",
-      "args": ["run", "--directory", "/Users/jonatassoares/Dev/mcp-brasil", "python", "-m", "mcp_brasil.server"]
-    }
-  }
-}
