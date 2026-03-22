@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from mcp_brasil.transparencia import tools
+from mcp_brasil.transparencia.constants import DEFAULT_PAGE_SIZE
 from mcp_brasil.transparencia.schemas import (
     BolsaFamiliaMunicipio,
     BolsaFamiliaSacado,
@@ -310,3 +311,74 @@ class TestConsultarViagens:
         with patch(f"{MODULE}.consultar_viagens", new_callable=AsyncMock, return_value=[]):
             result = await tools.consultar_viagens("00000000000")
         assert "Nenhuma viagem" in result
+
+
+# ---------------------------------------------------------------------------
+# Pagination hints
+# ---------------------------------------------------------------------------
+
+
+def _make_contratos(n: int) -> list[ContratoFornecedor]:
+    return [ContratoFornecedor(numero=f"CT-{i}") for i in range(n)]
+
+
+class TestPaginationHints:
+    @pytest.mark.asyncio
+    async def test_shows_next_page_hint(self) -> None:
+        """When results >= DEFAULT_PAGE_SIZE, hint to load next page."""
+        data = _make_contratos(DEFAULT_PAGE_SIZE)
+        with patch(f"{MODULE}.buscar_contratos", new_callable=AsyncMock, return_value=data):
+            result = await tools.buscar_contratos("12345678000190", pagina=1)
+        assert "pagina=2" in result
+
+    @pytest.mark.asyncio
+    async def test_no_hint_below_page_size(self) -> None:
+        """When results < DEFAULT_PAGE_SIZE on page 1, no hint."""
+        data = _make_contratos(3)
+        with patch(f"{MODULE}.buscar_contratos", new_callable=AsyncMock, return_value=data):
+            result = await tools.buscar_contratos("12345678000190", pagina=1)
+        assert "pagina=" not in result
+        assert "Última página" not in result
+
+    @pytest.mark.asyncio
+    async def test_last_page_hint(self) -> None:
+        """When results < DEFAULT_PAGE_SIZE on page > 1, show last page hint."""
+        data = _make_contratos(3)
+        with patch(f"{MODULE}.buscar_contratos", new_callable=AsyncMock, return_value=data):
+            result = await tools.buscar_contratos("12345678000190", pagina=2)
+        assert "Última página" in result
+
+    @pytest.mark.asyncio
+    async def test_despesas_hint(self) -> None:
+        data = [RecursoRecebido(ano=2024, mes=1, valor=100.0)] * DEFAULT_PAGE_SIZE
+        with patch(f"{MODULE}.consultar_despesas", new_callable=AsyncMock, return_value=data):
+            result = await tools.consultar_despesas("01/2024", "06/2024")
+        assert "pagina=2" in result
+
+    @pytest.mark.asyncio
+    async def test_servidores_hint(self) -> None:
+        data = [Servidor(nome="Test")] * DEFAULT_PAGE_SIZE
+        with patch(f"{MODULE}.buscar_servidores", new_callable=AsyncMock, return_value=data):
+            result = await tools.buscar_servidores(nome="Test")
+        assert "pagina=2" in result
+
+    @pytest.mark.asyncio
+    async def test_licitacoes_hint(self) -> None:
+        data = [Licitacao(numero="PE-001")] * DEFAULT_PAGE_SIZE
+        with patch(f"{MODULE}.buscar_licitacoes", new_callable=AsyncMock, return_value=data):
+            result = await tools.buscar_licitacoes()
+        assert "pagina=2" in result
+
+    @pytest.mark.asyncio
+    async def test_emendas_hint(self) -> None:
+        data = [Emenda(numero="EMD-001")] * DEFAULT_PAGE_SIZE
+        with patch(f"{MODULE}.buscar_emendas", new_callable=AsyncMock, return_value=data):
+            result = await tools.buscar_emendas()
+        assert "pagina=2" in result
+
+    @pytest.mark.asyncio
+    async def test_viagens_hint(self) -> None:
+        data = [Viagem(nome="Test")] * DEFAULT_PAGE_SIZE
+        with patch(f"{MODULE}.consultar_viagens", new_callable=AsyncMock, return_value=data):
+            result = await tools.consultar_viagens("12345678900")
+        assert "pagina=2" in result

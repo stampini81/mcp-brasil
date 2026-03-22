@@ -10,6 +10,16 @@ from __future__ import annotations
 from mcp_brasil._shared.formatting import format_brl, markdown_table, truncate_list
 
 from . import client
+from .constants import DEFAULT_PAGE_SIZE
+
+
+def _pagination_hint(count: int, pagina: int) -> str:
+    """Return a pagination hint string based on result count and current page."""
+    if count >= DEFAULT_PAGE_SIZE:
+        return f"\n\n> Use `pagina={pagina + 1}` para ver mais resultados."
+    if pagina > 1 and count < DEFAULT_PAGE_SIZE:
+        return "\n\n> Última página de resultados."
+    return ""
 
 
 async def buscar_contratos(cpf_cnpj: str, pagina: int = 1) -> str:
@@ -41,9 +51,10 @@ async def buscar_contratos(cpf_cnpj: str, pagina: int = 1) -> str:
         for c in contratos
     ]
     header = f"Contratos do fornecedor {cpf_cnpj} (página {pagina}):\n\n"
-    return header + markdown_table(
+    table = header + markdown_table(
         ["Número", "Objeto", "Valor Final", "Início", "Fim", "Órgão"], rows
     )
+    return table + _pagination_hint(len(contratos), pagina)
 
 
 async def consultar_despesas(
@@ -83,7 +94,8 @@ async def consultar_despesas(
         for d in despesas
     ]
     header = f"Despesas de {mes_ano_inicio} a {mes_ano_fim} (página {pagina}):\n\n"
-    return header + markdown_table(["Período", "Favorecido", "Valor", "Órgão", "UF"], rows)
+    table = header + markdown_table(["Período", "Favorecido", "Valor", "Órgão", "UF"], rows)
+    return table + _pagination_hint(len(despesas), pagina)
 
 
 async def buscar_servidores(
@@ -124,7 +136,8 @@ async def buscar_servidores(
     ]
     busca = cpf or nome
     header = f"Servidores encontrados para '{busca}' (página {pagina}):\n\n"
-    return header + markdown_table(["CPF", "Nome", "Tipo", "Situação", "Órgão"], rows)
+    table = header + markdown_table(["CPF", "Nome", "Tipo", "Situação", "Órgão"], rows)
+    return table + _pagination_hint(len(servidores), pagina)
 
 
 async def buscar_licitacoes(
@@ -168,9 +181,10 @@ async def buscar_licitacoes(
         for lc in licitacoes
     ]
     header = f"Licitações encontradas (página {pagina}):\n\n"
-    return header + markdown_table(
+    table = header + markdown_table(
         ["Número", "Objeto", "Modalidade", "Situação", "Valor Est.", "Abertura"], rows
     )
+    return table + _pagination_hint(len(licitacoes), pagina)
 
 
 async def consultar_bolsa_familia(
@@ -210,9 +224,10 @@ async def consultar_bolsa_familia(
             )
             for s in sacados
         ]
-        return f"Bolsa Família — NIS {nis} ({mes_ano}):\n\n" + markdown_table(
+        table = f"Bolsa Família — NIS {nis} ({mes_ano}):\n\n" + markdown_table(
             ["NIS", "Nome", "Município", "UF", "Valor"], rows
         )
+        return table + _pagination_hint(len(sacados), pagina)
 
     assert codigo_ibge is not None
     municipios = await client.consultar_bolsa_familia_municipio(mes_ano, codigo_ibge, pagina)
@@ -228,9 +243,10 @@ async def consultar_bolsa_familia(
         )
         for m in municipios
     ]
-    return f"Bolsa Família — Município {codigo_ibge} ({mes_ano}):\n\n" + markdown_table(
+    table = f"Bolsa Família — Município {codigo_ibge} ({mes_ano}):\n\n" + markdown_table(
         ["Município", "UF", "Beneficiados", "Valor", "Referência"], rows
     )
+    return table + _pagination_hint(len(municipios), pagina)
 
 
 async def buscar_sancoes(
@@ -277,7 +293,8 @@ async def buscar_sancoes(
         items.append("\n".join(parts))
 
     header = f"Sanções encontradas para '{consulta}' ({len(sancoes)} resultado(s)):\n\n"
-    return header + truncate_list(items, max_items=30)
+    result = header + truncate_list(items, max_items=30)
+    return result + _pagination_hint(len(sancoes), pagina)
 
 
 async def buscar_emendas(
@@ -313,9 +330,10 @@ async def buscar_emendas(
         for e in emendas
     ]
     header = f"Emendas parlamentares (página {pagina}):\n\n"
-    return header + markdown_table(
+    table = header + markdown_table(
         ["Número", "Autor", "Tipo", "Localidade", "Empenhado", "Pago"], rows
     )
+    return table + _pagination_hint(len(emendas), pagina)
 
 
 async def consultar_viagens(cpf: str, pagina: int = 1) -> str:
@@ -347,6 +365,7 @@ async def consultar_viagens(cpf: str, pagina: int = 1) -> str:
         for v in viagens
     ]
     header = f"Viagens do servidor CPF {cpf} (página {pagina}):\n\n"
-    return header + markdown_table(
+    table = header + markdown_table(
         ["Nome", "Cargo", "Órgão", "Destino", "Período", "Diárias", "Passagens"], rows
     )
+    return table + _pagination_hint(len(viagens), pagina)

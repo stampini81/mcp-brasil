@@ -1,5 +1,8 @@
 """Constants for the Transparência feature."""
 
+# Pagination
+DEFAULT_PAGE_SIZE = 15
+
 # API base URL
 TRANSPARENCIA_API_BASE = "https://api.portaldatransparencia.gov.br/api-de-dados"
 
