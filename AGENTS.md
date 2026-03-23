@@ -29,7 +29,7 @@ Os ADRs são a fonte de verdade. Nenhuma implementação deve contradizê-los.
 
 ## Tech Lead
 
-**Papel:** Guardião da arquitetura e das decisões técnicas.
+**Papel:** Guardião da arquitetura, decisões técnicas e gestão de releases.
 
 ### Responsabilidades
 
@@ -41,6 +41,7 @@ Os ADRs são a fonte de verdade. Nenhuma implementação deve contradizê-los.
   - Toda feature tem `mcp: FastMCP` no `server.py`
 - Revisa PRs e valida qualidade antes do merge
 - Define prioridade de features conforme roadmap (`plan/roadmap.md`)
+- **Gerencia releases** — decide quando e qual tipo de bump fazer
 
 ### Checklist de review
 
@@ -61,6 +62,54 @@ Ao revisar uma nova feature ou PR, verificar:
 - [ ] **Commits** seguem Conventional Commits
 - [ ] **TECH_DEBT.md atualizado** — débitos novos registrados, resolvidos marcados `[x]`
 
+### Gestão de Releases
+
+O Tech Lead é responsável por decidir **quando** e **como** fazer releases.
+
+#### Regras de release
+
+1. **Nunca editar versão manualmente** — usar `/release` ou `make release-*`
+2. **Nunca fazer release com CI vermelho** — a skill `/release` já bloqueia isso
+3. **Nunca fazer release fora da branch `main`**
+
+#### Quando fazer release
+
+| Acumulou na main | Ação | Comando |
+|------------------|------|---------|
+| Nova feature completa (nova API, novo agente) | minor bump | `/release -minor` |
+| Múltiplas features novas | minor bump | `/release -minor` |
+| Bug fixes, ajustes de endpoint | patch bump | `/release -patch` |
+| Breaking change (renomear tools, mudar API pública) | major bump | `/release -major` |
+| Apenas docs, testes, refactor interno | nenhum | Não precisa de release |
+
+#### Quando NÃO fazer release
+
+- Trabalho em progresso (features incompletas)
+- Apenas mudanças em docs/testes/CI (sem impacto no pacote)
+- CI vermelho ou testes falhando
+
+#### Workflow de release
+
+```
+1. Verificar que tudo está commitado e na main
+2. Analisar commits desde a última release (git log v<last>..HEAD)
+3. Decidir o tipo de bump baseado nos commits:
+   - Algum feat:  → minor
+   - Só fix/perf: → patch
+   - BREAKING:    → major
+4. Executar: /release -<tipo>
+5. Opcionalmente push: /release -<tipo> -push
+6. Opcionalmente publicar: /release -<tipo> -publish
+```
+
+#### Checklist pré-release
+
+- [ ] `make ci` verde (lint + types + tests)
+- [ ] Working tree limpa (`git status` vazio)
+- [ ] Na branch `main`
+- [ ] TECH_DEBT.md revisado — nenhum blocker aberto
+- [ ] Commits desde última release justificam o bump escolhido
+
 ### Referências
 
 - `plan/adrs/ADR-001-project-bootstrap.md` — Decisões de stack e organização
@@ -68,6 +117,9 @@ Ao revisar uma nova feature ou PR, verificar:
 - `plan/adrs/ADR-003-redator-oficial.md` — Padrão de agentes com Prompts + Resources + Tools
 - `plan/roadmap.md` — Roadmap e prioridades
 - `plan/poc-plan.md` — Inventário de APIs e plano de implementação
+- `.claude/skills/release/SKILL.md` — Skill de release
+- `cliff.toml` — Config do git-cliff (changelog)
+- `.github/workflows/release.yml` — CI/CD de release
 
 ---
 

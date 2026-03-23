@@ -136,6 +136,53 @@ test(ibge): add integration tests for localidades
 docs: update README with bacen feature
 ```
 
+## Releases
+
+**Regra:** Use a skill `/release` para gerenciar versões. Nunca edite a versão manualmente no `pyproject.toml`.
+
+### Quando fazer release
+
+| Situação | Bump | Exemplo |
+|----------|------|---------|
+| Nova feature completa (nova API, novo agente) | **minor** | `feat(saude): add 5 tools` |
+| Bug fix, ajuste de endpoint, melhoria interna | **patch** | `fix(bacen): handle timeout` |
+| Breaking change (renomear tools, mudar API pública) | **major** | refactor que quebra clientes |
+| Apenas docs, testes, refactor interno | **nenhum** | Não precisa de release |
+
+### Critérios obrigatórios para release
+
+1. **`make ci` verde** — lint + types + 100% dos testes passando
+2. **Working tree limpa** — tudo commitado, nada pendente
+3. **Branch `main`** — releases só saem da main
+4. **CHANGELOG.md atualizado** — gerado automaticamente via `git-cliff`
+
+### Fluxo
+
+```bash
+/release -minor           # bump + changelog + tag (local)
+/release -patch -push     # bump + changelog + tag + push
+/release -minor -publish  # bump + changelog + tag + push + PyPI
+```
+
+### Comandos Makefile
+
+```bash
+make version        # mostra versão atual
+make build          # uv build (sdist + wheel)
+make changelog      # gera CHANGELOG.md via git-cliff
+make release-patch  # CI + bump patch + changelog + tag
+make release-minor  # CI + bump minor + changelog + tag
+make release-major  # CI + bump major + changelog + tag
+```
+
+### Infraestrutura
+
+- **Versão**: `pyproject.toml` (source of truth), lida via `importlib.metadata` no `__init__.py`
+- **Changelog**: `git-cliff` com `cliff.toml` (conventional commits)
+- **CI**: `.github/workflows/ci.yml` (lint + types + test, Python 3.10-3.13)
+- **Release**: `.github/workflows/release.yml` (tag `v*` → CI + PyPI trusted publishing + GitHub Release)
+- **Semantic Release**: config em `pyproject.toml` (`[tool.semantic_release]`)
+
 ## Estrutura de testes
 
 Testes espelham `src/`:

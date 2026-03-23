@@ -1,33 +1,17 @@
-"""Compras feature server — registers tools, resources, and prompts.
+"""Compras feature server — composes sub-servers for each procurement source.
 
-This file only registers components. Zero business logic (ADR-001 rule #4).
+Uses FastMCP mount() to namespace tools from each data source:
+- pncp: Portal Nacional de Contratações Públicas (Lei 14.133/2021)
+- dadosabertos: Dados Abertos Compras.gov.br (SIASG/ComprasNet)
+
+This file only composes sub-servers. Zero business logic (ADR-001 rule #4).
 """
 
 from fastmcp import FastMCP
 
-from .prompts import investigar_fornecedor
-from .resources import modalidades_licitacao
-from .tools import (
-    buscar_atas,
-    buscar_contratacoes,
-    buscar_contratos,
-    buscar_itens,
-    consultar_fornecedor,
-    consultar_orgao,
-)
+from .pncp.server import mcp as pncp_mcp
 
 mcp = FastMCP("mcp-brasil-compras")
 
-# Tools
-mcp.tool(buscar_contratacoes)
-mcp.tool(buscar_contratos)
-mcp.tool(buscar_atas)
-mcp.tool(consultar_fornecedor)
-mcp.tool(buscar_itens)
-mcp.tool(consultar_orgao)
-
-# Resources
-mcp.resource("data://modalidades", mime_type="application/json")(modalidades_licitacao)
-
-# Prompts
-mcp.prompt(investigar_fornecedor)
+# Mount sub-sources with namespace (tools prefixed: pncp_buscar_contratacoes, etc.)
+mcp.mount(pncp_mcp, namespace="pncp")
