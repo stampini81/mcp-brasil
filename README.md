@@ -6,7 +6,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/mcp-brasil)](https://pypi.org/project/mcp-brasil/)
 [![Python](https://img.shields.io/pypi/pyversions/mcp-brasil)](https://pypi.org/project/mcp-brasil/)
-[![CI](https://img.shields.io/github/actions/workflow/status/jonatassoares/mcp-brasil/ci.yml)](https://github.com/jonatassoares/mcp-brasil/actions)
+[![CI](https://img.shields.io/github/actions/workflow/status/jxnxts/mcp-brasil/ci.yml)](https://github.com/jxnxts/mcp-brasil/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 205 tools · 58 resources · 47 prompts
@@ -15,7 +15,7 @@ Conecte AI agents (Claude, GPT, Copilot, etc.) a dados governamentais do Brasil 
 
 **24 APIs não requerem chave** · 2 usam chaves gratuitas (cadastro em 1 min)
 
-[Quick Start](#quick-start) · [Fontes de dados](#fontes-de-dados) · [Exemplos](#exemplos) · [Desenvolvimento](#desenvolvimento)
+[Quick Start](#quick-start) · [Fontes de dados](#fontes-de-dados) · [Casos de Uso](#casos-de-uso) · [Documentação](#documentação) · [Desenvolvimento](#desenvolvimento)
 
 </div>
 
@@ -105,7 +105,7 @@ Conecte o server e faça perguntas em linguagem natural:
 
 > **Transparência:** "Quais os 10 maiores contratos do governo federal em 2024? Quem são os fornecedores?"
 
-> **Cross-reference:** "Compare os gastos per capita com saúde em São Paulo e Minas Gerais usando dados do TCE-SP e TCE do outro estado."
+> **Cross-reference:** "Compare os gastos per capita com saúde em São Paulo e Minas Gerais cruzando dados do TCE-SP e IBGE."
 
 > **Judiciário:** "Busque processos sobre licitação irregular no TCU. Quais foram as penalidades aplicadas?"
 
@@ -150,7 +150,7 @@ Além das tools das features, o server raiz expõe 4 meta-tools: `listar_feature
 
 | API | Obrigatória? | Como obter |
 |-----|-------------|------------|
-| Portal da Transparência | Opcional | [Cadastro gratuito](http://portaldatransparencia.gov.br/api-de-dados/cadastrar-email) |
+| Portal da Transparência | Opcional | [Cadastro gratuito](https://portaldatransparencia.gov.br/api-de-dados/cadastrar-email) |
 | DataJud/CNJ | Opcional | [Cadastro gratuito](https://datajud-wiki.cnj.jus.br/api-publica/acesso) |
 | Todas as outras (24) | Nenhuma chave | — |
 
@@ -171,10 +171,40 @@ DATAJUD_API_KEY=sua-chave
 | `MCP_BRASIL_HTTP_TIMEOUT` | `30.0` | Timeout HTTP em segundos |
 | `MCP_BRASIL_HTTP_MAX_RETRIES` | `3` | Máximo de retentativas HTTP |
 
+## Documentação
+
+| Página | Descrição |
+|--------|-----------|
+| [Quick Start](docs/guide/quickstart.md) | Instalação e configuração em 2 minutos |
+| [Arquitetura](docs/concepts/architecture.md) | Como o projeto funciona por dentro |
+| [Catálogo de Features](docs/reference/features.md) | Todas as 27 features e suas 205 tools |
+| [Smart Tools](docs/reference/smart-tools.md) | Meta-tools: planner, batch, discovery |
+| [Adicionando Features](docs/guide/adding-features.md) | Guia para contribuir com novas APIs |
+| [Configuração](docs/reference/configuration.md) | Variáveis de ambiente e opções |
+| [Desenvolvimento](docs/guide/development.md) | Setup de dev, testes, lint, CI |
+
+## Casos de Uso
+
+Exemplos detalhados de como usar o mcp-brasil em diferentes contextos profissionais:
+
+| Caso de Uso | Descrição | APIs Combinadas |
+|-------------|-----------|-----------------|
+| [Raio-X Parlamentar](docs/examples/raio-x-parlamentar.md) | Conflito de interesses: doações × votações × contratos | Câmara, TSE, Transparência, TCU |
+| [Panorama Econômico](docs/examples/panorama-economico.md) | Dashboard econômico com Selic, IPCA, câmbio, PIB | Bacen, IBGE, Transparência |
+| [Fiscalização Municipal](docs/examples/fiscalizacao-municipal.md) | Onde vai o dinheiro da sua cidade — 9 TCEs cruzados | TCEs, PNCP, TransfereGov, IBGE |
+| [Análise Legislativa](docs/examples/analise-legislativa.md) | Ciclo completo de um PL: Câmara → Senado → Diário Oficial → STF | Câmara, Senado, Diário Oficial, DataJud |
+| [Cientista Político](docs/examples/cientista-politico.md) | Fidelidade partidária, coalizões, emendas como poder | Câmara, Senado, TSE, Transparência |
+| [Economista](docs/examples/economista.md) | Séries temporais, política fiscal, câmbio, crédito | Bacen (40K+ séries), IBGE |
+| [Jornalista Investigativo](docs/examples/jornalista-investigativo.md) | Rastrear emendas, licitações dirigidas, fornecedores suspeitos | Transparência, TCEs, TCU, PNCP, TSE |
+| [Jornalista — Matérias](docs/examples/jornalista-materias.md) | Produção de matérias data-driven com dados verificáveis | Bacen, IBGE, Câmara, INPE, TSE |
+| [Relatório Parlamentar](docs/examples/parlamentar-report.md) | Votação + emendas + despesas + financiamento de um parlamentar | Câmara, Senado, TSE, TransfereGov |
+| [Políticas Públicas](docs/examples/politicas-publicas.md) | Avaliar impacto: recursos investidos vs. resultados | TCEs, IBGE, CNES, Transparência, INPE |
+| [Redator Oficial](docs/examples/redator-oficial.md) | Gerar ofícios, pareceres e notas técnicas com dados reais | Redator + Bacen, Transparência, TCU |
+
 ## Desenvolvimento
 
 ```bash
-git clone https://github.com/jonatassoares/mcp-brasil.git
+git clone https://github.com/jxnxts/mcp-brasil.git
 cd mcp-brasil
 make dev              # Instalar dependências (prod + dev)
 make test             # Rodar todos os testes
