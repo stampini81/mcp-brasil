@@ -57,3 +57,26 @@ warn_unused_configs = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+
+# --- Release ---
+
+[tool.semantic_release]
+version_toml = ["pyproject.toml:project.version"]
+commit_parser = "conventional"
+allow_zero_version = true
+major_on_zero = false
+tag_format = "v{version}"
+build_command = "uv build"
+
+[tool.semantic_release.changelog]
+changelog_file = "CHANGELOG.md"
+
+[tool.semantic_release.remote]
+type = "github"
+
+[tool.semantic_release.remote.token]
+env = "GH_TOKEN"
+
+[tool.semantic_release.publish]
+upload_to_vcs_release = true
+dist_glob_patterns = ["dist/*"]

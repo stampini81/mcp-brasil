@@ -1,7 +1,7 @@
 # mcp-brasil — Makefile
 
 .DEFAULT_GOAL := help
-.PHONY: help sync dev test test-feature lint fix types run serve inspect ci clean
+.PHONY: help sync dev test test-feature lint fix types run serve inspect ci clean build changelog version release-patch release-minor release-major
 
 ## —— Setup ——
 
@@ -43,6 +43,26 @@ serve: ## Run MCP server (HTTP :8000)
 
 inspect: ## Inspect MCP server tools/resources/prompts
 	uv run python -c "from mcp_brasil.server import mcp, registry; print(registry.summary())"
+
+## —— Release ——
+
+version: ## Show current version
+	@uv version
+
+build: ## Build package (sdist + wheel)
+	uv build
+
+changelog: ## Generate CHANGELOG.md with git-cliff
+	git cliff -o CHANGELOG.md
+
+release-patch: ci ## Release patch version (0.1.0 → 0.1.1)
+	@scripts/release.sh patch
+
+release-minor: ci ## Release minor version (0.1.0 → 0.2.0)
+	@scripts/release.sh minor
+
+release-major: ci ## Release major version (0.1.0 → 1.0.0)
+	@scripts/release.sh major
 
 ## —— Misc ——
 
