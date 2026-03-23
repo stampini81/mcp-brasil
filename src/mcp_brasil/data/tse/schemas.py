@@ -94,6 +94,36 @@ class BemCandidato(BaseModel):
     valor: float | None = None
 
 
+class ResultadoCDN(BaseModel):
+    """Candidato com resultado do CDN de resultados do TSE."""
+
+    sequencia: str | None = None
+    nome: str | None = None
+    numero: str | None = None
+    nome_vice: str | None = None
+    coligacao: str | None = None
+    votos: int | None = None
+    percentual: str | None = None
+    eleito: bool = False
+    situacao: str | None = None
+    validade_voto: str | None = None
+
+
+class ResultadoRegiao(BaseModel):
+    """Resultado de uma eleição em uma região (país, estado ou município)."""
+
+    codigo: str | None = None
+    tipo: str | None = None  # "br", "uf", "mu"
+    uf: str | None = None
+    data_eleicao: str | None = None
+    total_secoes: int | None = None
+    pct_apurado: str | None = None
+    total_eleitores: int | None = None
+    total_comparecimento: int | None = None
+    total_abstencoes: int | None = None
+    candidatos: list[ResultadoCDN] = []
+
+
 class PrestaContas(BaseModel):
     """Resumo da prestação de contas de campanha."""
 

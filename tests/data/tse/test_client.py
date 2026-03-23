@@ -5,7 +5,12 @@ import pytest
 import respx
 
 from mcp_brasil.data.tse import client
-from mcp_brasil.data.tse.constants import CANDIDATURA_URL, ELEICAO_URL, PRESTADOR_URL
+from mcp_brasil.data.tse.constants import (
+    CANDIDATURA_URL,
+    ELEICAO_URL,
+    PRESTADOR_URL,
+    RESULTADOS_CDN_BASE,
+)
 
 
 class TestAnosEleitorais:
@@ -331,3 +336,158 @@ class TestParserEdgeCases:
         result = client._parse_presta_contas({})
         assert result.total_recebido is None
         assert result.total_despesas is None
+
+
+# --- CDN de Resultados ---
+
+CDN_RESULT_JSON = {
+    "ele": 544,
+    "tpabr": "uf",
+    "cdabr": "SP",
+    "dt": "02/10/2022",
+    "s": 101073,
+    "e": 34684927,
+    "c": 27189714,
+    "a": 7495213,
+    "pst": "100.00",
+    "cand": [
+        {
+            "seq": "0001",
+            "n": "22",
+            "nm": "JAIR BOLSONARO",
+            "cc": "PL",
+            "nv": "BRAGA NETTO",
+            "e": "s",
+            "st": "2 turno",
+            "dvt": "Válido",
+            "vap": "12239989",
+            "pvap": "47.71",
+        },
+        {
+            "seq": "0002",
+            "n": "13",
+            "nm": "LULA",
+            "cc": "PT",
+            "nv": "GERALDO ALCKMIN",
+            "e": "s",
+            "st": "2 turno",
+            "dvt": "Válido",
+            "vap": "10490032",
+            "pvap": "40.89",
+        },
+    ],
+}
+
+
+class TestResolveEleicao:
+    def test_known_election(self) -> None:
+        ciclo, eleicao = client._resolve_eleicao(2022, 1)
+        assert ciclo == "ele2022"
+        assert eleicao == "000544"
+
+    def test_unknown_election_raises(self) -> None:
+        with pytest.raises(ValueError, match="não mapeada"):
+            client._resolve_eleicao(1990, 1)
+
+
+class TestResolveCargo:
+    def test_known_cargo(self) -> None:
+        assert client._resolve_cargo("presidente") == "0001"
+        assert client._resolve_cargo("governador") == "0003"
+        assert client._resolve_cargo("prefeito") == "0011"
+
+    def test_unknown_cargo_raises(self) -> None:
+        with pytest.raises(ValueError, match="não mapeado"):
+            client._resolve_cargo("papa")
+
+
+class TestParseResultadoCDN:
+    def test_parses_candidate(self) -> None:
+        raw = CDN_RESULT_JSON["cand"][0]
+        result = client._parse_resultado_cdn(raw)
+        assert result.nome == "JAIR BOLSONARO"
+        assert result.numero == "22"
+        assert result.votos == 12239989
+        assert result.percentual == "47.71"
+        assert result.eleito is True
+
+    def test_parses_not_elected(self) -> None:
+        raw = {"nm": "TESTE", "n": "99", "e": "n", "vap": "100"}
+        result = client._parse_resultado_cdn(raw)
+        assert result.eleito is False
+        assert result.votos == 100
+
+
+class TestParseResultadoRegiao:
+    def test_parses_region(self) -> None:
+        result = client._parse_resultado_regiao(CDN_RESULT_JSON)
+        assert result.uf == "SP"
+        assert result.total_secoes == 101073
+        assert result.total_eleitores == 34684927
+        assert result.pct_apurado == "100.00"
+        assert len(result.candidatos) == 2
+        # Should be sorted by votes (descending)
+        assert result.candidatos[0].nome == "JAIR BOLSONARO"
+        assert result.candidatos[1].nome == "LULA"
+
+
+class TestResultadoSimplificado:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_returns_parsed_result(self) -> None:
+        url = (
+            f"{RESULTADOS_CDN_BASE}/ele2022/000544/dados-simplificados/sp/sp-c0001-e000544-r.json"
+        )
+        respx.get(url).mock(return_value=httpx.Response(200, json=CDN_RESULT_JSON))
+        result = await client.resultado_simplificado(2022, "presidente", "sp", 1)
+        assert result is not None
+        assert result.uf == "SP"
+        assert len(result.candidatos) == 2
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_returns_none_on_404(self) -> None:
+        url = (
+            f"{RESULTADOS_CDN_BASE}/ele2022/000544/dados-simplificados/xx/xx-c0001-e000544-r.json"
+        )
+        respx.get(url).mock(return_value=httpx.Response(404))
+        result = await client.resultado_simplificado(2022, "presidente", "xx", 1)
+        assert result is None
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_nacional(self) -> None:
+        url = (
+            f"{RESULTADOS_CDN_BASE}/ele2022/000544/dados-simplificados/br/br-c0001-e000544-r.json"
+        )
+        br_json = {**CDN_RESULT_JSON, "cdabr": "BR", "tpabr": "br"}
+        respx.get(url).mock(return_value=httpx.Response(200, json=br_json))
+        result = await client.resultado_simplificado(2022, "presidente", "br", 1)
+        assert result is not None
+        assert result.uf == "BR"
+
+
+class TestResultadoTodosEstados:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_returns_list(self) -> None:
+        # Mock SP and RJ only, rest 404
+        sp_url = (
+            f"{RESULTADOS_CDN_BASE}/ele2022/000544/dados-simplificados/sp/sp-c0001-e000544-r.json"
+        )
+        rj_url = (
+            f"{RESULTADOS_CDN_BASE}/ele2022/000544/dados-simplificados/rj/rj-c0001-e000544-r.json"
+        )
+        sp_json = {**CDN_RESULT_JSON, "cdabr": "SP"}
+        rj_json = {**CDN_RESULT_JSON, "cdabr": "RJ"}
+        respx.get(sp_url).mock(return_value=httpx.Response(200, json=sp_json))
+        respx.get(rj_url).mock(return_value=httpx.Response(200, json=rj_json))
+        # All other UFs get 404
+        respx.get(url__regex=r".*/dados-simplificados/(?!sp|rj).*").mock(
+            return_value=httpx.Response(404)
+        )
+        result = await client.resultado_todos_estados(2022, "presidente", 1)
+        assert len(result) == 2
+        ufs = {r.uf for r in result}
+        assert "SP" in ufs
+        assert "RJ" in ufs

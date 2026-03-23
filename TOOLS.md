@@ -1,6 +1,6 @@
 # MCP Brasil — Catálogo de Tools, Resources e Prompts
 
-> Gerado em 2026-03-22. Total: **124 tools**, **30 resources**, **22 prompts** em **13 features**.
+> Gerado em 2026-03-22. Total: **128 tools**, **30 resources**, **22 prompts** em **13 features**.
 
 ## Resumo por Feature
 
@@ -17,7 +17,7 @@
 | [Senado](#senado) | 22 | 3 | 3 | — |
 | [TransfereGov](#transferegov) | 5 | 1 | 1 | — |
 | [Transparência](#transparência) | 18 | 4 | 3 | `TRANSPARENCIA_API_KEY` |
-| [TSE](#tse) | 8 | 2 | 2 | — |
+| [TSE](#tse) | 13 | 2 | 2 | — |
 
 ---
 
@@ -413,7 +413,7 @@ Portal da Transparência — contratos, despesas, servidores, emendas, sanções
 
 Tribunal Superior Eleitoral — eleições, candidatos, prestação de contas.
 
-### Tools (8)
+### Tools (13)
 
 | Tool | Descrição |
 |------|-----------|
@@ -424,7 +424,12 @@ Tribunal Superior Eleitoral — eleições, candidatos, prestação de contas.
 | `listar_cargos` | Lista cargos disponíveis em um município |
 | `listar_candidatos` | Lista candidatos para um cargo em um município |
 | `buscar_candidato` | Busca detalhes completos de um candidato |
+| `resultado_eleicao` | Resultado de eleição com candidatos rankeados por votos |
 | `consultar_prestacao_contas` | Consulta prestação de contas de campanha |
+| `resultado_nacional` | Resultado nacional de uma eleição (CDN) |
+| `resultado_por_estado` | Resultado de uma eleição em um estado específico (CDN) |
+| `mapa_resultado_estados` | Mapa eleitoral — vencedor em cada estado (CDN) |
+| `apuracao_status` | Status da apuração (seções, comparecimento, abstenções) (CDN) |
 
 ### Resources (2)
 

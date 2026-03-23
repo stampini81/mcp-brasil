@@ -9,6 +9,7 @@ from .prompts import analise_candidato, comparativo_eleicao
 from .resources import cargos_eleitorais, info_api
 from .tools import (
     anos_eleitorais,
+    apuracao_status,
     buscar_candidato,
     consultar_prestacao_contas,
     listar_candidatos,
@@ -16,12 +17,15 @@ from .tools import (
     listar_eleicoes,
     listar_eleicoes_suplementares,
     listar_estados_suplementares,
+    mapa_resultado_estados,
     resultado_eleicao,
+    resultado_nacional,
+    resultado_por_estado,
 )
 
 mcp = FastMCP("mcp-brasil-tse")
 
-# Tools (9)
+# Tools — DivulgaCandContas (9)
 mcp.tool(anos_eleitorais)
 mcp.tool(listar_eleicoes)
 mcp.tool(listar_eleicoes_suplementares)
@@ -31,6 +35,12 @@ mcp.tool(listar_candidatos)
 mcp.tool(buscar_candidato)
 mcp.tool(resultado_eleicao)
 mcp.tool(consultar_prestacao_contas)
+
+# Tools — CDN de Resultados (4)
+mcp.tool(resultado_nacional)
+mcp.tool(resultado_por_estado)
+mcp.tool(mapa_resultado_estados)
+mcp.tool(apuracao_status)
 
 # Resources
 mcp.resource("data://cargos-eleitorais", mime_type="application/json")(cargos_eleitorais)

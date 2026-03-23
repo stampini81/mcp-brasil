@@ -12,11 +12,12 @@ CLIENT_MODULE = "mcp_brasil.data.tse.client"
 
 class TestToolsRegistered:
     @pytest.mark.asyncio
-    async def test_all_9_tools_registered(self) -> None:
+    async def test_all_13_tools_registered(self) -> None:
         async with Client(mcp) as c:
             tool_list = await c.list_tools()
             names = {t.name for t in tool_list}
             expected = {
+                # DivulgaCandContas (9)
                 "anos_eleitorais",
                 "listar_eleicoes",
                 "listar_eleicoes_suplementares",
@@ -26,6 +27,11 @@ class TestToolsRegistered:
                 "buscar_candidato",
                 "resultado_eleicao",
                 "consultar_prestacao_contas",
+                # CDN de Resultados (4)
+                "resultado_nacional",
+                "resultado_por_estado",
+                "mapa_resultado_estados",
+                "apuracao_status",
             }
             assert expected.issubset(names), f"Missing: {expected - names}"
 
@@ -96,3 +102,78 @@ class TestToolExecution:
                 )
                 assert "CANDIDATO A" in result.data
                 assert "10.000" in result.data
+
+    @pytest.mark.asyncio
+    async def test_resultado_nacional_e2e(self) -> None:
+        from mcp_brasil.data.tse.schemas import ResultadoCDN, ResultadoRegiao
+
+        mock_data = ResultadoRegiao(
+            uf="BR",
+            pct_apurado="100.00",
+            total_eleitores=156000000,
+            candidatos=[
+                ResultadoCDN(nome="LULA", numero="13", votos=60000000, percentual="50.90"),
+            ],
+        )
+        with patch(
+            f"{CLIENT_MODULE}.resultado_simplificado",
+            new_callable=AsyncMock,
+            return_value=mock_data,
+        ):
+            async with Client(mcp) as c:
+                result = await c.call_tool(
+                    "resultado_nacional",
+                    {"ano": 2022, "cargo": "presidente"},
+                )
+                assert "LULA" in result.data
+                assert "Resultado Nacional" in result.data
+
+    @pytest.mark.asyncio
+    async def test_resultado_por_estado_e2e(self) -> None:
+        from mcp_brasil.data.tse.schemas import ResultadoCDN, ResultadoRegiao
+
+        mock_data = ResultadoRegiao(
+            uf="SP",
+            pct_apurado="100.00",
+            total_eleitores=34000000,
+            candidatos=[
+                ResultadoCDN(nome="BOLSONARO", numero="22", votos=12000000, percentual="47.71"),
+            ],
+        )
+        with patch(
+            f"{CLIENT_MODULE}.resultado_simplificado",
+            new_callable=AsyncMock,
+            return_value=mock_data,
+        ):
+            async with Client(mcp) as c:
+                result = await c.call_tool(
+                    "resultado_por_estado",
+                    {"ano": 2022, "cargo": "presidente", "uf": "SP"},
+                )
+                assert "BOLSONARO" in result.data
+                assert "SP" in result.data
+
+    @pytest.mark.asyncio
+    async def test_apuracao_status_e2e(self) -> None:
+        from mcp_brasil.data.tse.schemas import ResultadoRegiao
+
+        mock_data = ResultadoRegiao(
+            uf="BR",
+            pct_apurado="100.00",
+            total_secoes=472075,
+            total_eleitores=156000000,
+            total_comparecimento=124000000,
+            total_abstencoes=32000000,
+        )
+        with patch(
+            f"{CLIENT_MODULE}.resultado_simplificado",
+            new_callable=AsyncMock,
+            return_value=mock_data,
+        ):
+            async with Client(mcp) as c:
+                result = await c.call_tool(
+                    "apuracao_status",
+                    {"ano": 2022, "cargo": "presidente"},
+                )
+                assert "Status da Apuração" in result.data
+                assert "100.00%" in result.data

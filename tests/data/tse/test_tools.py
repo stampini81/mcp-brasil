@@ -15,6 +15,8 @@ from mcp_brasil.data.tse.schemas import (
     Eleicao,
     PrestaContas,
     ResultadoCandidato,
+    ResultadoCDN,
+    ResultadoRegiao,
 )
 
 MODULE = "mcp_brasil.data.tse.client"
@@ -276,3 +278,189 @@ class TestConsultarPrestacaoContas:
         ):
             result = await tools.consultar_prestacao_contas(999, 2020, 999, 999, 999)
         assert "não encontrada" in result
+
+
+# --- CDN de Resultados ---
+
+
+def _mock_ctx() -> AsyncMock:
+    """Create a mock FastMCP Context."""
+    ctx = AsyncMock()
+    ctx.info = AsyncMock()
+    ctx.warning = AsyncMock()
+    return ctx
+
+
+def _make_resultado_regiao(
+    uf: str = "BR",
+    candidatos: list[ResultadoCDN] | None = None,
+) -> ResultadoRegiao:
+    """Build a ResultadoRegiao for testing."""
+    if candidatos is None:
+        candidatos = [
+            ResultadoCDN(
+                nome="LULA",
+                numero="13",
+                votos=60345999,
+                percentual="50.90",
+                eleito=True,
+                situacao="Eleito",
+            ),
+            ResultadoCDN(
+                nome="JAIR BOLSONARO",
+                numero="22",
+                votos=58206354,
+                percentual="49.10",
+                eleito=False,
+                situacao="2 turno",
+            ),
+        ]
+    return ResultadoRegiao(
+        codigo=uf,
+        tipo="br" if uf == "BR" else "uf",
+        uf=uf,
+        pct_apurado="100.00",
+        total_secoes=472075,
+        total_eleitores=156454011,
+        total_comparecimento=124252796,
+        total_abstencoes=32201215,
+        candidatos=candidatos,
+    )
+
+
+class TestResultadoNacional:
+    @pytest.mark.asyncio
+    async def test_formats_national_result(self) -> None:
+        ctx = _mock_ctx()
+        resultado = _make_resultado_regiao("BR")
+        with patch(
+            f"{MODULE}.resultado_simplificado",
+            new_callable=AsyncMock,
+            return_value=resultado,
+        ):
+            result = await tools.resultado_nacional(2022, "presidente", ctx, 1)
+        assert "Resultado Nacional" in result
+        assert "Presidente" in result
+        assert "LULA" in result
+        assert "JAIR BOLSONARO" in result
+        assert "100.00%" in result
+
+    @pytest.mark.asyncio
+    async def test_not_found(self) -> None:
+        ctx = _mock_ctx()
+        with patch(
+            f"{MODULE}.resultado_simplificado",
+            new_callable=AsyncMock,
+            return_value=None,
+        ):
+            result = await tools.resultado_nacional(2022, "presidente", ctx)
+        assert "não encontrado" in result.lower()
+
+    @pytest.mark.asyncio
+    async def test_invalid_election_returns_error(self) -> None:
+        ctx = _mock_ctx()
+        with patch(
+            f"{MODULE}.resultado_simplificado",
+            new_callable=AsyncMock,
+            side_effect=ValueError("Eleição 1990 turno 1 não mapeada"),
+        ):
+            result = await tools.resultado_nacional(1990, "presidente", ctx)
+        assert "não mapeada" in result
+
+
+class TestResultadoPorEstado:
+    @pytest.mark.asyncio
+    async def test_formats_state_result(self) -> None:
+        ctx = _mock_ctx()
+        resultado = _make_resultado_regiao("SP")
+        with patch(
+            f"{MODULE}.resultado_simplificado",
+            new_callable=AsyncMock,
+            return_value=resultado,
+        ):
+            result = await tools.resultado_por_estado(2022, "presidente", "SP", ctx, 1)
+        assert "SP" in result
+        assert "Presidente" in result
+        assert "LULA" in result
+
+    @pytest.mark.asyncio
+    async def test_not_found(self) -> None:
+        ctx = _mock_ctx()
+        with patch(
+            f"{MODULE}.resultado_simplificado",
+            new_callable=AsyncMock,
+            return_value=None,
+        ):
+            result = await tools.resultado_por_estado(2022, "presidente", "XX", ctx)
+        assert "não encontrado" in result.lower()
+
+
+class TestMapaResultadoEstados:
+    @pytest.mark.asyncio
+    async def test_formats_map(self) -> None:
+        ctx = _mock_ctx()
+        resultados = [
+            _make_resultado_regiao("SP"),
+            _make_resultado_regiao("RJ"),
+        ]
+        with patch(
+            f"{MODULE}.resultado_todos_estados",
+            new_callable=AsyncMock,
+            return_value=resultados,
+        ):
+            result = await tools.mapa_resultado_estados(2022, "presidente", ctx, 1)
+        assert "Mapa Eleitoral" in result
+        assert "SP" in result
+        assert "RJ" in result
+        assert "2 estados" in result
+
+    @pytest.mark.asyncio
+    async def test_empty(self) -> None:
+        ctx = _mock_ctx()
+        with patch(
+            f"{MODULE}.resultado_todos_estados",
+            new_callable=AsyncMock,
+            return_value=[],
+        ):
+            result = await tools.mapa_resultado_estados(2022, "presidente", ctx)
+        assert "Nenhum resultado" in result
+
+
+class TestApuracaoStatus:
+    @pytest.mark.asyncio
+    async def test_formats_status(self) -> None:
+        ctx = _mock_ctx()
+        resultado = _make_resultado_regiao("BR")
+        with patch(
+            f"{MODULE}.resultado_simplificado",
+            new_callable=AsyncMock,
+            return_value=resultado,
+        ):
+            result = await tools.apuracao_status(2022, "presidente", ctx, "br", 1)
+        assert "Status da Apuração" in result
+        assert "Nacional" in result
+        assert "100.00%" in result
+
+    @pytest.mark.asyncio
+    async def test_state_level(self) -> None:
+        ctx = _mock_ctx()
+        resultado = _make_resultado_regiao("SP")
+        with patch(
+            f"{MODULE}.resultado_simplificado",
+            new_callable=AsyncMock,
+            return_value=resultado,
+        ):
+            result = await tools.apuracao_status(2022, "presidente", ctx, "SP", 1)
+        assert "SP" in result
+        assert "Status da Apuração" in result
+
+    @pytest.mark.asyncio
+    async def test_not_found(self) -> None:
+        ctx = _mock_ctx()
+        with patch(
+            f"{MODULE}.resultado_simplificado",
+            new_callable=AsyncMock,
+            return_value=None,
+        ):
+            result = await tools.apuracao_status(2022, "presidente", ctx)
+        assert "não encontrados" in result.lower()

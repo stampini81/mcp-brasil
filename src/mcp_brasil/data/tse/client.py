@@ -12,7 +12,15 @@ from typing import Any
 from mcp_brasil._shared.http_client import http_get
 from mcp_brasil._shared.rate_limiter import RateLimiter
 
-from .constants import CANDIDATURA_URL, ELEICAO_URL, PRESTADOR_URL
+from .constants import (
+    CANDIDATURA_URL,
+    CARGO_CODES_CDN,
+    ELEICAO_URL,
+    ELEICOES_CDN,
+    PRESTADOR_URL,
+    RESULTADOS_CDN_BASE,
+    UFS_BRASIL,
+)
 from .schemas import (
     Candidato,
     CandidatoResumo,
@@ -20,6 +28,8 @@ from .schemas import (
     Eleicao,
     PrestaContas,
     ResultadoCandidato,
+    ResultadoCDN,
+    ResultadoRegiao,
 )
 
 logger = logging.getLogger(__name__)
@@ -262,6 +272,134 @@ async def resultado_eleicao(
         resultados = [_parse_resultado_candidato(c) for c in _safe_list(cands_raw, "resultado")]
         return sorted(resultados, key=lambda r: r.total_votos or 0, reverse=True)
     return []
+
+
+# --- CDN de Resultados (resultados.tse.jus.br) ---
+
+
+def _resolve_eleicao(ano: int, turno: int = 1) -> tuple[str, str]:
+    """Resolve ano+turno em ciclo+codigo_eleicao.
+
+    Returns:
+        (ciclo, codigo_eleicao) ex: ("ele2022", "000544")
+
+    Raises:
+        ValueError: se a eleição não está mapeada.
+    """
+    key = (ano, turno)
+    if key not in ELEICOES_CDN:
+        disponiveis = ", ".join(f"{a} T{t}" for a, t in sorted(ELEICOES_CDN.keys()))
+        raise ValueError(f"Eleição {ano} turno {turno} não mapeada. Disponíveis: {disponiveis}")
+    return ELEICOES_CDN[key]
+
+
+def _resolve_cargo(cargo: str) -> str:
+    """Resolve nome do cargo em código CDN.
+
+    Args:
+        cargo: Nome do cargo (ex: "presidente", "governador").
+
+    Returns:
+        Código CDN do cargo (ex: "0001").
+
+    Raises:
+        ValueError: se o cargo não está mapeado.
+    """
+    cargo_lower = cargo.lower().strip().replace(" ", "_")
+    if cargo_lower not in CARGO_CODES_CDN:
+        disponiveis = ", ".join(CARGO_CODES_CDN.keys())
+        raise ValueError(f"Cargo '{cargo}' não mapeado. Disponíveis: {disponiveis}")
+    return CARGO_CODES_CDN[cargo_lower]
+
+
+def _parse_resultado_cdn(raw: dict[str, Any]) -> ResultadoCDN:
+    """Parse a candidate result from CDN JSON."""
+    return ResultadoCDN(
+        sequencia=raw.get("seq"),
+        nome=raw.get("nm"),
+        numero=raw.get("n"),
+        nome_vice=raw.get("nv"),
+        coligacao=raw.get("cc"),
+        votos=_safe_int(raw.get("vap")),
+        percentual=raw.get("pvap"),
+        eleito=raw.get("e") == "s",
+        situacao=raw.get("st"),
+        validade_voto=raw.get("dvt"),
+    )
+
+
+def _parse_resultado_regiao(data: dict[str, Any]) -> ResultadoRegiao:
+    """Parse region-level result from CDN JSON."""
+    cands = [_parse_resultado_cdn(c) for c in data.get("cand", [])]
+    cands.sort(key=lambda c: c.votos or 0, reverse=True)
+
+    return ResultadoRegiao(
+        codigo=data.get("cdabr"),
+        tipo=data.get("tpabr"),
+        uf=data.get("cdabr"),
+        data_eleicao=data.get("dt"),
+        total_secoes=_safe_int(data.get("s")),
+        pct_apurado=data.get("pst"),
+        total_eleitores=_safe_int(data.get("e")),
+        total_comparecimento=_safe_int(data.get("c")),
+        total_abstencoes=_safe_int(data.get("a")),
+        candidatos=cands,
+    )
+
+
+async def resultado_simplificado(
+    ano: int, cargo: str, uf: str = "br", turno: int = 1
+) -> ResultadoRegiao | None:
+    """Busca resultado simplificado de um cargo em uma região.
+
+    Args:
+        ano: Ano da eleição (ex: 2022, 2024).
+        cargo: Nome do cargo (ex: "presidente", "governador", "prefeito").
+        uf: Sigla da UF ou "br" para nacional.
+        turno: Turno da eleição (1 ou 2).
+
+    Returns:
+        ResultadoRegiao com candidatos rankeados por votos, ou None se 404.
+    """
+    ciclo, eleicao = _resolve_eleicao(ano, turno)
+    cargo_code = _resolve_cargo(cargo)
+    uf_lower = uf.lower().strip()
+
+    url = (
+        f"{RESULTADOS_CDN_BASE}/{ciclo}/{eleicao}/"
+        f"dados-simplificados/{uf_lower}/{uf_lower}-c{cargo_code}-e{eleicao}-r.json"
+    )
+
+    try:
+        data = await _get(url)
+    except Exception:
+        logger.warning("CDN resultado indisponível: %s", url)
+        return None
+
+    if not isinstance(data, dict) or "cand" not in data:
+        return None
+
+    return _parse_resultado_regiao(data)
+
+
+async def resultado_todos_estados(ano: int, cargo: str, turno: int = 1) -> list[ResultadoRegiao]:
+    """Busca resultado de um cargo em todos os estados (27 UFs).
+
+    Faz requests paralelos para cada UF.
+
+    Args:
+        ano: Ano da eleição.
+        cargo: Nome do cargo.
+        turno: Turno.
+
+    Returns:
+        Lista de ResultadoRegiao, um por UF (ignora falhas silenciosamente).
+    """
+    import asyncio
+
+    tasks = [resultado_simplificado(ano, cargo, uf, turno) for uf in UFS_BRASIL]
+    results = await asyncio.gather(*tasks)
+    return [r for r in results if r is not None]
 
 
 async def consultar_prestacao_contas(

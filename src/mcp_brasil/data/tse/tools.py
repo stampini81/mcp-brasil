@@ -7,9 +7,12 @@ Rules (ADR-001):
 
 from __future__ import annotations
 
+from fastmcp import Context
+
 from mcp_brasil._shared.formatting import format_brl, format_number_br, markdown_table
 
 from . import client
+from .constants import CARGO_CODES_CDN
 
 
 async def anos_eleitorais() -> str:
@@ -328,5 +331,242 @@ async def consultar_prestacao_contas(
         lines.append(f"\n**Dívida de campanha:** {contas.divida_campanha}")
     if contas.sobra_financeira:
         lines.append(f"**Sobra financeira:** {contas.sobra_financeira}")
+
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# CDN de Resultados — votação por região (país, estado, município)
+# ---------------------------------------------------------------------------
+
+
+def _cargos_disponiveis() -> str:
+    """Return comma-separated list of available cargo names."""
+    return ", ".join(CARGO_CODES_CDN.keys())
+
+
+async def resultado_nacional(
+    ano: int,
+    cargo: str,
+    ctx: Context,
+    turno: int = 1,
+) -> str:
+    """Mostra o resultado nacional de uma eleição com todos os candidatos.
+
+    Retorna a totalização de votos em nível nacional: total de eleitores,
+    comparecimento, abstenções e ranking de candidatos por votos.
+
+    Cargos disponíveis: presidente, governador, senador, deputado_federal,
+    deputado_estadual, prefeito, vereador.
+
+    Eleições disponíveis: 2022 (federal) e 2024 (municipal).
+
+    Args:
+        ano: Ano da eleição (ex: 2022, 2024).
+        cargo: Nome do cargo (ex: "presidente", "prefeito").
+        turno: Turno da eleição (1 ou 2). Default: 1.
+
+    Returns:
+        Tabela com ranking nacional de candidatos por votos.
+    """
+    await ctx.info(f"Buscando resultado nacional {cargo} {ano} T{turno}...")
+
+    try:
+        resultado = await client.resultado_simplificado(ano, cargo, "br", turno)
+    except ValueError as e:
+        return str(e)
+
+    if resultado is None or not resultado.candidatos:
+        return f"Resultado não encontrado para {cargo} {ano} turno {turno}."
+
+    header_lines = [
+        f"**Resultado Nacional — {cargo.replace('_', ' ').title()} {ano} (T{turno})**\n",
+        f"Apuração: {resultado.pct_apurado}% das seções",
+    ]
+    if resultado.total_eleitores:
+        header_lines.append(f"Eleitores: {format_number_br(resultado.total_eleitores, 0)}")
+    if resultado.total_comparecimento:
+        header_lines.append(
+            f"Comparecimento: {format_number_br(resultado.total_comparecimento, 0)}"
+        )
+    if resultado.total_abstencoes:
+        header_lines.append(f"Abstenções: {format_number_br(resultado.total_abstencoes, 0)}")
+
+    rows = [
+        (
+            str(i),
+            (c.nome or "—")[:25],
+            c.numero or "—",
+            format_number_br(c.votos, 0) if c.votos else "—",
+            f"{c.percentual}%" if c.percentual else "—",
+            (c.situacao or "—")[:15],
+        )
+        for i, c in enumerate(resultado.candidatos, 1)
+    ]
+
+    return (
+        "\n".join(header_lines)
+        + "\n\n"
+        + markdown_table(["#", "Candidato", "Nº", "Votos", "%", "Situação"], rows)
+    )
+
+
+async def resultado_por_estado(
+    ano: int,
+    cargo: str,
+    uf: str,
+    ctx: Context,
+    turno: int = 1,
+) -> str:
+    """Mostra o resultado de uma eleição em um estado específico.
+
+    Retorna a totalização de votos de cada candidato naquele estado.
+
+    Args:
+        ano: Ano da eleição (ex: 2022, 2024).
+        cargo: Nome do cargo (ex: "presidente", "governador").
+        uf: Sigla do estado (ex: "SP", "RJ", "PI").
+        turno: Turno da eleição (1 ou 2). Default: 1.
+
+    Returns:
+        Tabela com ranking de candidatos no estado.
+    """
+    await ctx.info(f"Buscando resultado {cargo} {ano} em {uf.upper()}...")
+
+    try:
+        resultado = await client.resultado_simplificado(ano, cargo, uf, turno)
+    except ValueError as e:
+        return str(e)
+
+    if resultado is None or not resultado.candidatos:
+        return f"Resultado não encontrado para {cargo} {ano} T{turno} em {uf.upper()}."
+
+    header_lines = [
+        f"**Resultado {uf.upper()} — {cargo.replace('_', ' ').title()} {ano} (T{turno})**\n",
+        f"Apuração: {resultado.pct_apurado}% das seções",
+    ]
+    if resultado.total_eleitores:
+        header_lines.append(f"Eleitores: {format_number_br(resultado.total_eleitores, 0)}")
+
+    rows = [
+        (
+            str(i),
+            (c.nome or "—")[:25],
+            c.numero or "—",
+            format_number_br(c.votos, 0) if c.votos else "—",
+            f"{c.percentual}%" if c.percentual else "—",
+        )
+        for i, c in enumerate(resultado.candidatos, 1)
+    ]
+
+    return (
+        "\n".join(header_lines)
+        + "\n\n"
+        + markdown_table(["#", "Candidato", "Nº", "Votos", "%"], rows)
+    )
+
+
+async def mapa_resultado_estados(
+    ano: int,
+    cargo: str,
+    ctx: Context,
+    turno: int = 1,
+) -> str:
+    """Mostra quem venceu em cada estado — mapa eleitoral completo.
+
+    Faz consulta paralela em todos os 27 estados e retorna o candidato
+    mais votado em cada UF com votos e percentual.
+
+    Args:
+        ano: Ano da eleição (ex: 2022).
+        cargo: Nome do cargo (ex: "presidente").
+        turno: Turno da eleição (1 ou 2). Default: 1.
+
+    Returns:
+        Tabela com vencedor de cada estado.
+    """
+    await ctx.info(f"Buscando mapa eleitoral {cargo} {ano} T{turno} (27 UFs)...")
+
+    try:
+        resultados = await client.resultado_todos_estados(ano, cargo, turno)
+    except ValueError as e:
+        return str(e)
+
+    if not resultados:
+        return f"Nenhum resultado encontrado para {cargo} {ano} turno {turno}."
+
+    rows = []
+    for r in sorted(resultados, key=lambda x: (x.uf or "").upper()):
+        if not r.candidatos:
+            continue
+        vencedor = r.candidatos[0]
+        rows.append(
+            (
+                (r.uf or "—").upper(),
+                (vencedor.nome or "—")[:20],
+                vencedor.numero or "—",
+                format_number_br(vencedor.votos, 0) if vencedor.votos else "—",
+                f"{vencedor.percentual}%" if vencedor.percentual else "—",
+                f"{r.pct_apurado}%" if r.pct_apurado else "—",
+            )
+        )
+
+    header = (
+        f"**Mapa Eleitoral — {cargo.replace('_', ' ').title()} {ano} (T{turno})**\n"
+        f"{len(rows)} estados com dados\n"
+    )
+    return (
+        header + "\n" + markdown_table(["UF", "Mais votado", "Nº", "Votos", "%", "Apuração"], rows)
+    )
+
+
+async def apuracao_status(
+    ano: int,
+    cargo: str,
+    ctx: Context,
+    uf: str = "br",
+    turno: int = 1,
+) -> str:
+    """Mostra o status da apuração de uma eleição.
+
+    Retorna percentual de seções apuradas, total de eleitores,
+    comparecimento e abstenções.
+
+    Args:
+        ano: Ano da eleição.
+        cargo: Nome do cargo.
+        uf: Sigla do estado ou "br" para nacional. Default: "br".
+        turno: Turno da eleição. Default: 1.
+
+    Returns:
+        Resumo do status da apuração.
+    """
+    regiao_label = "Nacional" if uf.lower() == "br" else uf.upper()
+    await ctx.info(f"Consultando apuração {cargo} {ano} ({regiao_label})...")
+
+    try:
+        resultado = await client.resultado_simplificado(ano, cargo, uf, turno)
+    except ValueError as e:
+        return str(e)
+
+    if resultado is None:
+        return f"Dados de apuração não encontrados para {cargo} {ano} T{turno}."
+
+    lines = [
+        f"**Status da Apuração — {cargo.replace('_', ' ').title()} {ano} (T{turno})**",
+        f"**Região:** {regiao_label}",
+        f"**Seções apuradas:** {resultado.pct_apurado}%"
+        + (f" de {format_number_br(resultado.total_secoes, 0)}" if resultado.total_secoes else ""),
+    ]
+
+    if resultado.total_eleitores:
+        lines.append(f"**Eleitores:** {format_number_br(resultado.total_eleitores, 0)}")
+    if resultado.total_comparecimento:
+        lines.append(f"**Comparecimento:** {format_number_br(resultado.total_comparecimento, 0)}")
+    if resultado.total_abstencoes and resultado.total_eleitores:
+        pct_abs = resultado.total_abstencoes / resultado.total_eleitores * 100
+        lines.append(
+            f"**Abstenções:** {format_number_br(resultado.total_abstencoes, 0)} ({pct_abs:.1f}%)"
+        )
 
     return "\n".join(lines)
