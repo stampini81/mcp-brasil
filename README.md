@@ -4,16 +4,16 @@
 
 # mcp-brasil
 
-**MCP Server para 27 APIs públicas brasileiras**
+**MCP Server para 28 APIs públicas brasileiras**
 
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-204 tools · 58 resources · 47 prompts
+213 tools · 55 resources · 45 prompts
 
 Conecte AI agents (Claude, GPT, Copilot, etc.) a dados governamentais do Brasil — economia, legislação, transparência, judiciário, eleições, meio ambiente, saúde e mais.
 
-**24 APIs não requerem chave** · 2 usam chaves gratuitas (cadastro em 1 min)
+**26 APIs não requerem chave** · 2 usam chaves gratuitas (cadastro em 1 min)
 
 [Quick Start](#quick-start) · [Fontes de dados](#fontes-de-dados) · [Casos de Uso](#casos-de-uso) · [Documentação](#documentação) · [Desenvolvimento](#desenvolvimento)
 
@@ -23,7 +23,7 @@ Conecte AI agents (Claude, GPT, Copilot, etc.) a dados governamentais do Brasil 
 
 ## Features
 
-- **204 tools** em 27 features — econômico, legislativo, transparência, judiciário, eleitoral, ambiental, saúde, compras públicas
+- **213 tools** em 28 features — econômico, legislativo, transparência, judiciário, eleitoral, ambiental, saúde, compras públicas, oceanografia
 - **Cross-referencing** com `planejar_consulta` — cria planos de execução combinando múltiplas APIs (ex: gastos de um deputado + votações + proposições)
 - **Execução em lote** com `executar_lote` — dispara consultas em paralelo numa única chamada
 - **Smart discovery** — BM25 search transform filtra 204 tools para só mostrar as relevantes ao contexto
@@ -136,6 +136,7 @@ Conecte o server e faça perguntas em linguagem natural:
 | **Ambiental** | `inpe` | INPE — focos de queimadas e desmatamento | 4 |
 | | `ana` | ANA — estações hidrológicas, telemetria, reservatórios | 3 |
 | **Saúde** | `saude` | CNES/DataSUS — estabelecimentos, profissionais, leitos | 4 |
+| **Oceanografia** | `tabua_mares` | Tábua de Marés — previsão de marés para portos do litoral brasileiro | 7 |
 | **Compras Públicas** | `pncp` | PNCP — contratações públicas (Lei 14.133/2021) | 6 |
 | | `dadosabertos` | Compras.gov.br — SIASG/ComprasNet | 8 |
 | **Utilidades** | `brasilapi` | BrasilAPI — CEP, CNPJ, DDD, bancos, câmbio, FIPE, PIX | 16 |
@@ -152,7 +153,7 @@ Além das tools das features, o server raiz expõe 4 meta-tools: `listar_feature
 |-----|-------------|------------|
 | Portal da Transparência | Opcional | [Cadastro gratuito](https://portaldatransparencia.gov.br/api-de-dados/cadastrar-email) |
 | DataJud/CNJ | Opcional | [Cadastro gratuito](https://datajud-wiki.cnj.jus.br/api-publica/acesso) |
-| Todas as outras (24) | Nenhuma chave | — |
+| Todas as outras (26) | Nenhuma chave | — |
 
 Configure via variáveis de ambiente ou `.env`:
 
@@ -177,7 +178,7 @@ DATAJUD_API_KEY=sua-chave
 |--------|-----------|
 | [Quick Start](docs/guide/quickstart.md) | Instalação e configuração em 2 minutos |
 | [Arquitetura](docs/concepts/architecture.md) | Como o projeto funciona por dentro |
-| [Catálogo de Features](docs/reference/features.md) | Todas as 27 features e suas 204 tools |
+| [Catálogo de Features](docs/reference/features.md) | Todas as 28 features e suas 213 tools |
 | [Smart Tools](docs/reference/smart-tools.md) | Meta-tools: planner, batch, discovery |
 | [Adicionando Features](docs/guide/adding-features.md) | Guia para contribuir com novas APIs |
 | [Configuração](docs/reference/configuration.md) | Variáveis de ambiente e opções |
@@ -226,7 +227,7 @@ O projeto usa **Package by Feature** com **Auto-Registry** — cada feature é u
 src/mcp_brasil/
 ├── server.py              # Auto-registry (nunca editado manualmente)
 ├── _shared/               # Utilitários compartilhados
-├── data/                  # 26 features de consulta a APIs
+├── data/                  # 27 features de consulta a APIs
 │   ├── ibge/
 │   │   ├── __init__.py    # FEATURE_META
 │   │   ├── server.py      # FastMCP instance
