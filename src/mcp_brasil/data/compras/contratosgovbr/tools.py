@@ -41,11 +41,9 @@ async def listar_contratos_unidade(
             [
                 f"### {i}. {c.objeto or 'Sem descrição'}",
                 f"**ID:** {c.id} | **Nº:** {c.numero or 'N/A'}",
-                f"**Fornecedor:** {c.fornecedor_nome or 'N/A'}"
-                f" ({c.fornecedor_cnpj_cpf or 'N/A'})",
+                f"**Fornecedor:** {c.fornecedor_nome or 'N/A'} ({c.fornecedor_cnpj_cpf or 'N/A'})",
                 f"**Valor global:** {c.valor_global or 'N/A'}",
-                f"**Vigência:** {c.vigencia_inicio or 'N/A'}"
-                f" a {c.vigencia_fim or 'N/A'}",
+                f"**Vigência:** {c.vigencia_inicio or 'N/A'} a {c.vigencia_fim or 'N/A'}",
                 f"**Situação:** {c.situacao or 'N/A'}",
                 "",
             ]
@@ -79,8 +77,7 @@ async def consultar_contrato_id(
             f"## Contrato {c.numero or contrato_id}",
             f"**Órgão:** {c.orgao_nome or 'N/A'} ({c.orgao_codigo or 'N/A'})",
             f"**UG:** {c.unidade_nome or 'N/A'} ({c.unidade_codigo or 'N/A'})",
-            f"**Fornecedor:** {c.fornecedor_nome or 'N/A'}"
-            f" ({c.fornecedor_cnpj_cpf or 'N/A'})",
+            f"**Fornecedor:** {c.fornecedor_nome or 'N/A'} ({c.fornecedor_cnpj_cpf or 'N/A'})",
             f"**Objeto:** {c.objeto or 'N/A'}",
             f"**Tipo:** {c.tipo or 'N/A'} | **Categoria:** {c.categoria or 'N/A'}",
             f"**Modalidade:** {c.modalidade or 'N/A'}",
@@ -160,10 +157,8 @@ async def consultar_faturas_contrato(
         lines.extend(
             [
                 f"### {i}. Fatura {f.numero or 'N/A'}",
-                f"**Emissão:** {f.emissao or 'N/A'}"
-                f" | **Vencimento:** {f.vencimento or 'N/A'}",
-                f"**Valor:** {f.valor or 'N/A'}"
-                f" | **Líquido:** {f.valorliquido or 'N/A'}",
+                f"**Emissão:** {f.emissao or 'N/A'} | **Vencimento:** {f.vencimento or 'N/A'}",
+                f"**Valor:** {f.valor or 'N/A'} | **Líquido:** {f.valorliquido or 'N/A'}",
                 f"**Glosa:** {f.glosa or 'N/A'}"
                 f" | **Juros:** {f.juros or 'N/A'}"
                 f" | **Multa:** {f.multa or 'N/A'}",
@@ -202,8 +197,7 @@ async def consultar_historico_contrato(
                 f"### {i}. {h.tipo or 'N/A'} nº {h.numero or 'N/A'}",
                 f"**Fornecedor:** {h.fornecedor or 'N/A'}",
                 f"**Assinatura:** {h.data_assinatura or 'N/A'}",
-                f"**Vigência:** {h.vigencia_inicio or 'N/A'}"
-                f" a {h.vigencia_fim or 'N/A'}",
+                f"**Vigência:** {h.vigencia_inicio or 'N/A'} a {h.vigencia_fim or 'N/A'}",
                 f"**Valor global:** {h.valor_global or 'N/A'}",
                 f"**Situação:** {h.situacao_contrato or 'N/A'}",
                 "",
@@ -238,11 +232,10 @@ async def consultar_itens_contrato(
         lines.extend(
             [
                 f"### {i}. {item.descricao_item or 'Sem descrição'}",
-                f"**Código:** {item.codigo_item or 'N/A'}"
-                f" | **Tipo:** {item.tipo_item or 'N/A'}",
+                f"**Código:** {item.codigo_item or 'N/A'} | **Tipo:** {item.tipo_item or 'N/A'}",
                 f"**Qtd:** {item.quantidade or 'N/A'}"
                 f" {item.unidade or ''}"
-                f" × {item.valor_unitario or 'N/A'}"
+                f" x {item.valor_unitario or 'N/A'}"
                 f" = **{item.valor_total or 'N/A'}**",
                 "",
             ]
@@ -271,9 +264,7 @@ async def consultar_terceirizados_contrato(
     if not terceirizados:
         return f"Nenhum terceirizado encontrado para o contrato {contrato_id}."
 
-    lines = [
-        f"**{len(terceirizados)} terceirizados no contrato {contrato_id}**\n"
-    ]
+    lines = [f"**{len(terceirizados)} terceirizados no contrato {contrato_id}**\n"]
     for i, t in enumerate(terceirizados, 1):
         lines.extend(
             [

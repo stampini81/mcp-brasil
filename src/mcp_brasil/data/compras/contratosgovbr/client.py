@@ -3,6 +3,11 @@
 Base URL: https://contratos.comprasnet.gov.br
 Auth: None required for public endpoints (/api/contrato/)
 Response format: JSON arrays or objects (no pagination wrapper)
+
+Note: The API returns two different contract formats:
+- /api/contrato/id/{id} — flat fields (orgao_codigo, orgao_nome, fornecedor_nome)
+- /api/contrato/ug/{id} — nested dicts (contratante.orgao, fornecedor.nome)
+The _parse_contrato function handles both formats.
 """
 
 from __future__ import annotations
@@ -29,22 +34,51 @@ from .schemas import (
 
 
 def _parse_contrato(item: dict[str, Any]) -> ContratoResumo:
+    """Parse contract from either flat (/id/) or nested (/ug/) format."""
+    # Flat format (from /api/contrato/id/{id})
+    orgao_codigo = item.get("orgao_codigo")
+    orgao_nome = item.get("orgao_nome")
+    unidade_codigo = item.get("unidade_codigo")
+    unidade_nome = item.get("unidade_nome")
+    fornecedor_tipo = item.get("fornecedor_tipo")
+    fornecedor_cnpj_cpf = item.get("fonecedor_cnpj_cpf_idgener")
+    fornecedor_nome = item.get("fornecedor_nome")
+    fundamento_legal = item.get("fundamento_legal")
+
+    # Nested format (from /api/contrato/ug/{id})
+    contratante = item.get("contratante")
+    if contratante and isinstance(contratante, dict):
+        orgao = contratante.get("orgao", {})
+        if orgao:
+            orgao_codigo = orgao_codigo or orgao.get("codigo")
+            orgao_nome = orgao_nome or orgao.get("nome")
+            ug = orgao.get("unidade_gestora", {})
+            if ug:
+                unidade_codigo = unidade_codigo or ug.get("codigo")
+                unidade_nome = unidade_nome or ug.get("nome")
+
+    fornecedor = item.get("fornecedor")
+    if fornecedor and isinstance(fornecedor, dict):
+        fornecedor_tipo = fornecedor_tipo or fornecedor.get("tipo")
+        fornecedor_cnpj_cpf = fornecedor_cnpj_cpf or fornecedor.get("cnpj_cpf_idgener")
+        fornecedor_nome = fornecedor_nome or fornecedor.get("nome")
+
     return ContratoResumo(
         id=item.get("id"),
         receita_despesa=item.get("receita_despesa"),
         numero=item.get("numero"),
-        orgao_codigo=item.get("orgao_codigo"),
-        orgao_nome=item.get("orgao_nome"),
-        unidade_codigo=item.get("unidade_codigo"),
-        unidade_nome=item.get("unidade_nome"),
-        fornecedor_tipo=item.get("fornecedor_tipo"),
-        fornecedor_cnpj_cpf=item.get("fonecedor_cnpj_cpf_idgener"),
-        fornecedor_nome=item.get("fornecedor_nome"),
+        orgao_codigo=orgao_codigo,
+        orgao_nome=orgao_nome,
+        unidade_codigo=unidade_codigo,
+        unidade_nome=unidade_nome,
+        fornecedor_tipo=fornecedor_tipo,
+        fornecedor_cnpj_cpf=fornecedor_cnpj_cpf,
+        fornecedor_nome=fornecedor_nome,
         tipo=item.get("tipo"),
         categoria=item.get("categoria"),
         processo=item.get("processo"),
         objeto=item.get("objeto"),
-        fundamento_legal=item.get("fundamento_legal"),
+        fundamento_legal=fundamento_legal,
         modalidade=item.get("modalidade"),
         data_assinatura=item.get("data_assinatura"),
         data_publicacao=item.get("data_publicacao"),
@@ -72,18 +106,23 @@ async def listar_unidades() -> list[dict[str, Any]]:
 
 async def listar_contratos_ug(unidade_codigo: int) -> list[ContratoResumo]:
     """List active contracts for a UG (Unidade Gestora)."""
-    data: list[dict[str, Any]] = await http_get(
-        f"{CONTRATO_POR_UG_URL}/{unidade_codigo}"
-    )
+    data: list[dict[str, Any]] = await http_get(f"{CONTRATO_POR_UG_URL}/{unidade_codigo}")
     return [_parse_contrato(i) for i in data] if isinstance(data, list) else []
 
 
 async def consultar_contrato(contrato_id: int) -> ContratoResumo | None:
-    """Get a single contract by ID."""
-    data: dict[str, Any] = await http_get(f"{CONTRATO_POR_ID_URL}/{contrato_id}")
-    if not data or "error" in data:
-        return None
-    return _parse_contrato(data)
+    """Get a single contract by ID. API returns a list; we take the first item."""
+    data: Any = await http_get(f"{CONTRATO_POR_ID_URL}/{contrato_id}")
+    # API returns a list even for single ID lookups
+    if isinstance(data, list):
+        if not data:
+            return None
+        return _parse_contrato(data[0])
+    if isinstance(data, dict):
+        if "error" in data:
+            return None
+        return _parse_contrato(data)
+    return None
 
 
 async def listar_empenhos(contrato_id: int) -> list[Empenho]:
@@ -140,20 +179,24 @@ async def listar_historico(contrato_id: int) -> list[HistoricoContrato]:
     )
     if not isinstance(data, list):
         return []
-    return [
-        HistoricoContrato(
-            id=i.get("id"),
-            tipo=i.get("tipo"),
-            numero=i.get("numero"),
-            fornecedor=i.get("fornecedor"),
-            data_assinatura=i.get("data_assinatura"),
-            vigencia_inicio=i.get("vigencia_inicio"),
-            vigencia_fim=i.get("vigencia_fim"),
-            valor_global=i.get("valor_global"),
-            situacao_contrato=i.get("situacao_contrato"),
+    result: list[HistoricoContrato] = []
+    for i in data:
+        forn = i.get("fornecedor")
+        forn_nome = forn.get("nome") if isinstance(forn, dict) else forn
+        result.append(
+            HistoricoContrato(
+                id=i.get("id"),
+                tipo=i.get("tipo"),
+                numero=i.get("numero"),
+                fornecedor=forn_nome,
+                data_assinatura=i.get("data_assinatura"),
+                vigencia_inicio=i.get("vigencia_inicio"),
+                vigencia_fim=i.get("vigencia_fim"),
+                valor_global=i.get("valor_global"),
+                situacao_contrato=i.get("situacao_contrato"),
+            )
         )
-        for i in data
-    ]
+    return result
 
 
 async def listar_itens(contrato_id: int) -> list[ItemContrato]:
