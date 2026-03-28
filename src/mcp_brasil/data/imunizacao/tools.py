@@ -284,18 +284,18 @@ async def calendario_vacinacao(ctx: Context) -> str:
 
     for _grupo_key, grupo in GRUPOS_IMUNOBIOLOGICOS.items():
         grupo_nome = grupo["nome"]
-        vacinas = grupo["vacinas"]  # type: ignore[index]
+        vacinas = grupo["vacinas"]
         lines.append(f"\n### {grupo_nome}\n")
 
         rows = [
             (
-                v["sigla"],  # type: ignore[index]
-                v["nome"],  # type: ignore[index]
-                str(v["doses"]),  # type: ignore[index]
-                v["idade"],  # type: ignore[index]
-                ", ".join(v.get("doencas", [])),  # type: ignore[union-attr]
+                v["sigla"],
+                v["nome"],
+                str(v["doses"]),
+                v["idade"],
+                ", ".join(v.get("doencas", [])),
             )
-            for v in vacinas  # type: ignore[union-attr]
+            for v in vacinas
         ]
         lines.append(markdown_table(["Sigla", "Vacina", "Doses", "Idade", "Previne"], rows))
 

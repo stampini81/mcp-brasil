@@ -6,6 +6,10 @@ Sources:
     - Calendário Nacional de Vacinação (Ministério da Saúde)
 """
 
+from __future__ import annotations
+
+from typing import Any
+
 # ---------------------------------------------------------------------------
 # CKAN API (OpenDataSUS)
 # ---------------------------------------------------------------------------
@@ -39,7 +43,7 @@ MAX_LIMIT = 100
 # Calendário Nacional de Vacinação (Ministério da Saúde, 2024)
 # ---------------------------------------------------------------------------
 
-GRUPOS_IMUNOBIOLOGICOS: dict[str, dict[str, object]] = {
+GRUPOS_IMUNOBIOLOGICOS: dict[str, dict[str, Any]] = {
     "basicas_crianca": {
         "nome": "Vacinas Básicas da Criança",
         "vacinas": [

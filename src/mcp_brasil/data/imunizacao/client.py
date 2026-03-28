@@ -276,8 +276,8 @@ def listar_todas_vacinas() -> list[dict[str, Any]]:
     vacinas: list[dict[str, Any]] = []
     for grupo_key, grupo in GRUPOS_IMUNOBIOLOGICOS.items():
         grupo_nome = grupo["nome"]
-        for v in grupo["vacinas"]:  # type: ignore[union-attr]
-            entry = dict(v)  # type: ignore[arg-type]
+        for v in grupo["vacinas"]:
+            entry = dict(v)
             entry["grupo"] = str(grupo_nome)
             entry["grupo_key"] = grupo_key
             vacinas.append(entry)
