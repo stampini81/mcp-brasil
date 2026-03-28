@@ -84,7 +84,7 @@ async def consultar_acordaos(
             a.colegiado,
             a.relator,
             a.data_sessao,
-            (a.sumario[:100] + "..." if len(a.sumario or "") > 100 else a.sumario) or "—",
+            ((a.sumario or "")[:100] + "..." if len(a.sumario or "") > 100 else a.sumario) or "—",
         )
         for a in acordaos_exibir
     ]
