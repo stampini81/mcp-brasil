@@ -19,7 +19,7 @@ CLIENT_MODULE = "mcp_brasil.data.farmacia_popular.client"
 
 class TestToolsRegistered:
     @pytest.mark.asyncio
-    async def test_all_6_tools_registered(self) -> None:
+    async def test_all_8_tools_registered(self) -> None:
         async with Client(mcp) as c:
             tool_list = await c.list_tools()
             names = {t.name for t in tool_list}
@@ -30,8 +30,11 @@ class TestToolsRegistered:
                 "buscar_por_indicacao",
                 "estatisticas_programa",
                 "verificar_elegibilidade",
+                "municipios_atendidos",
+                "farmacia_mais_proxima",
             }
             assert expected.issubset(names), f"Missing: {expected - names}"
+            assert len(tool_list) == 8
 
     @pytest.mark.asyncio
     async def test_tools_have_docstrings(self) -> None:

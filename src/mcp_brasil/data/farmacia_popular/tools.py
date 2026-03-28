@@ -216,3 +216,89 @@ async def verificar_elegibilidade(ctx: Context) -> str:
         "- Quantidade dispensada conforme prescrição médica\n"
         "- Programa disponível em farmácias credenciadas em todo o Brasil"
     )
+
+
+async def municipios_atendidos(
+    ctx: Context,
+    codigo_uf: str,
+    limit: int = 50,
+) -> str:
+    """Lista municípios com farmácias credenciadas ao Farmácia Popular em uma UF.
+
+    Busca farmácias por estado e agrupa por município, mostrando quantas
+    farmácias credenciadas existem em cada cidade.
+
+    Args:
+        codigo_uf: Código IBGE do estado (ex: "35" para SP, "33" para RJ).
+        limit: Número máximo de farmácias a consultar (padrão: 50).
+
+    Returns:
+        Tabela de municípios com quantidade de farmácias credenciadas.
+    """
+    await ctx.info(f"Buscando municípios atendidos na UF {codigo_uf}...")
+
+    resultados = await client.buscar_farmacias(codigo_uf=codigo_uf, limit=limit)
+
+    if not resultados:
+        return (
+            f"Nenhuma farmácia credenciada encontrada na UF {codigo_uf}. "
+            "Verifique se o código IBGE do estado está correto."
+        )
+
+    # Group by municipality
+    municipios: dict[str, int] = {}
+    for f in resultados:
+        mun = f.codigo_municipio or "Desconhecido"
+        municipios[mun] = municipios.get(mun, 0) + 1
+
+    rows = [(cod, str(qtd)) for cod, qtd in sorted(municipios.items(), key=lambda x: -x[1])]
+
+    header = (
+        f"**Municípios com Farmácia Popular — UF {codigo_uf}** "
+        f"({len(municipios)} município(s), {len(resultados)} farmácia(s))\n\n"
+    )
+    return header + markdown_table(["Código Município", "Farmácias"], rows)
+
+
+async def farmacia_mais_proxima(
+    ctx: Context,
+    codigo_municipio: str,
+    limit: int = 10,
+) -> str:
+    """Busca farmácias credenciadas ao Farmácia Popular em um município.
+
+    Retorna as farmácias do programa mais próximas, ordenadas por nome.
+    Use o código IBGE do município para filtrar.
+
+    Args:
+        codigo_municipio: Código IBGE do município (ex: "355030" para São Paulo).
+        limit: Número máximo de farmácias (padrão: 10).
+
+    Returns:
+        Lista das farmácias credenciadas no município.
+    """
+    await ctx.info(f"Buscando farmácias no município {codigo_municipio}...")
+
+    resultados = await client.buscar_farmacias(codigo_municipio=codigo_municipio, limit=limit)
+
+    if not resultados:
+        return (
+            f"Nenhuma farmácia credenciada encontrada no município {codigo_municipio}. "
+            "Tente buscar por UF com municipios_atendidos() ou verifique o código IBGE."
+        )
+
+    rows = [
+        (
+            f.codigo_cnes or "—",
+            f.nome_fantasia or f.nome_razao_social or "—",
+            f.endereco or "—",
+            f.tipo_gestao or "—",
+        )
+        for f in resultados
+    ]
+
+    header = (
+        f"**Farmácias credenciadas** — município {codigo_municipio} "
+        f"({len(resultados)} resultado(s))\n\n"
+    )
+    return header + markdown_table(["CNES", "Nome", "Endereço", "Gestão"], rows)

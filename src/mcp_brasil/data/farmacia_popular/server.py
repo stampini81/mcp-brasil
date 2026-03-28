@@ -11,20 +11,24 @@ from .tools import (
     buscar_farmacias,
     buscar_por_indicacao,
     estatisticas_programa,
+    farmacia_mais_proxima,
     listar_medicamentos,
+    municipios_atendidos,
     verificar_elegibilidade,
     verificar_medicamento,
 )
 
 mcp = FastMCP("mcp-brasil-farmacia-popular")
 
-# Tools (6)
+# Tools (8)
 mcp.tool(buscar_farmacias, tags={"busca", "farmacias", "estabelecimentos"})
 mcp.tool(listar_medicamentos, tags={"listagem", "medicamentos", "gratuitos"})
 mcp.tool(verificar_medicamento, tags={"consulta", "medicamento", "verificacao"})
 mcp.tool(buscar_por_indicacao, tags={"busca", "medicamentos", "indicacao", "doenca"})
 mcp.tool(estatisticas_programa, tags={"estatisticas", "programa", "resumo"})
 mcp.tool(verificar_elegibilidade, tags={"elegibilidade", "requisitos", "documentos"})
+mcp.tool(municipios_atendidos, tags={"busca", "municipios", "uf", "cobertura"})
+mcp.tool(farmacia_mais_proxima, tags={"busca", "farmacias", "municipio", "proxima"})
 
 # Resources (URIs without namespace prefix — mount adds "farmacia_popular/" automatically)
 mcp.resource("data://catalogo-medicamentos", mime_type="application/json")(catalogo_medicamentos)

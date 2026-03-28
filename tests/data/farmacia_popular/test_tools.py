@@ -188,3 +188,90 @@ class TestVerificarElegibilidade:
         assert "CPF" in result
         assert "receita" in result.lower()
         assert "120 dias" in result
+
+
+# ---------------------------------------------------------------------------
+# municipios_atendidos
+# ---------------------------------------------------------------------------
+
+
+class TestMunicipiosAtendidos:
+    @pytest.mark.asyncio
+    async def test_formats_table(self) -> None:
+        mock_data = [
+            FarmaciaEstabelecimento(
+                codigo_cnes="111",
+                nome_fantasia="Farm A",
+                codigo_municipio="355030",
+            ),
+            FarmaciaEstabelecimento(
+                codigo_cnes="222",
+                nome_fantasia="Farm B",
+                codigo_municipio="355030",
+            ),
+            FarmaciaEstabelecimento(
+                codigo_cnes="333",
+                nome_fantasia="Farm C",
+                codigo_municipio="355060",
+            ),
+        ]
+        ctx = _mock_ctx()
+        with patch(
+            f"{CLIENT_MODULE}.buscar_farmacias",
+            new_callable=AsyncMock,
+            return_value=mock_data,
+        ):
+            result = await tools.municipios_atendidos(ctx, codigo_uf="35")
+        assert "2 município(s)" in result
+        assert "3 farmácia(s)" in result
+        assert "355030" in result
+
+    @pytest.mark.asyncio
+    async def test_empty(self) -> None:
+        ctx = _mock_ctx()
+        with patch(
+            f"{CLIENT_MODULE}.buscar_farmacias",
+            new_callable=AsyncMock,
+            return_value=[],
+        ):
+            result = await tools.municipios_atendidos(ctx, codigo_uf="99")
+        assert "Nenhuma farmácia" in result
+
+
+# ---------------------------------------------------------------------------
+# farmacia_mais_proxima
+# ---------------------------------------------------------------------------
+
+
+class TestFarmaciaMaisProxima:
+    @pytest.mark.asyncio
+    async def test_formats_table(self) -> None:
+        mock_data = [
+            FarmaciaEstabelecimento(
+                codigo_cnes="444",
+                nome_fantasia="Farmácia Saúde",
+                endereco="Av. Brasil, 500",
+                tipo_gestao="Privado",
+            ),
+        ]
+        ctx = _mock_ctx()
+        with patch(
+            f"{CLIENT_MODULE}.buscar_farmacias",
+            new_callable=AsyncMock,
+            return_value=mock_data,
+        ):
+            result = await tools.farmacia_mais_proxima(ctx, codigo_municipio="355030")
+        assert "Farmácia Saúde" in result
+        assert "444" in result
+        assert "1 resultado(s)" in result
+
+    @pytest.mark.asyncio
+    async def test_empty(self) -> None:
+        ctx = _mock_ctx()
+        with patch(
+            f"{CLIENT_MODULE}.buscar_farmacias",
+            new_callable=AsyncMock,
+            return_value=[],
+        ):
+            result = await tools.farmacia_mais_proxima(ctx, codigo_municipio="000000")
+        assert "Nenhuma farmácia" in result
