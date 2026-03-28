@@ -1,10 +1,11 @@
 """HTTP client for the CNES/DataSUS API.
 
 Endpoints:
-    - /estabelecimentos     → buscar_estabelecimentos
-    - /profissionais        → buscar_profissionais
-    - /tipodeestabelecimento → listar_tipos_estabelecimento
-    - /leitos               → consultar_leitos
+    - /estabelecimentos          → buscar_estabelecimentos
+    - /estabelecimentos/{cnes}   → buscar_estabelecimento_por_cnes
+    - /profissionais             → buscar_profissionais
+    - /tipodeestabelecimento     → listar_tipos_estabelecimento
+    - /leitos                    → consultar_leitos
 """
 
 from __future__ import annotations
@@ -21,7 +22,13 @@ from .constants import (
     PROFISSIONAIS_URL,
     TIPOS_URL,
 )
-from .schemas import Estabelecimento, Leito, Profissional, TipoEstabelecimento
+from .schemas import (
+    Estabelecimento,
+    EstabelecimentoDetalhe,
+    Leito,
+    Profissional,
+    TipoEstabelecimento,
+)
 
 
 def _parse_estabelecimento(raw: dict[str, Any]) -> Estabelecimento:
@@ -171,3 +178,77 @@ async def consultar_leitos(
 
     data: list[dict[str, Any]] = await http_get(LEITOS_URL, params=params)
     return [_parse_leito(item) for item in data]
+
+
+def _parse_estabelecimento_detalhe(raw: dict[str, Any]) -> EstabelecimentoDetalhe:
+    """Parse a raw establishment dict into an EstabelecimentoDetalhe model."""
+    return EstabelecimentoDetalhe(
+        codigo_cnes=str(raw.get("codigo_cnes", "") or ""),
+        nome_fantasia=raw.get("nome_fantasia"),
+        nome_razao_social=raw.get("nome_razao_social"),
+        natureza_organizacao=raw.get("natureza_organizacao"),
+        tipo_gestao=raw.get("tipo_gestao"),
+        codigo_tipo=str(raw.get("codigo_tipo_estabelecimento", "") or ""),
+        descricao_tipo=raw.get("descricao_tipo_estabelecimento"),
+        codigo_municipio=str(raw.get("codigo_municipio", "") or ""),
+        codigo_uf=str(raw.get("codigo_uf", "") or ""),
+        endereco=raw.get("endereco"),
+        bairro=raw.get("bairro"),
+        cep=raw.get("cep"),
+        telefone=raw.get("telefone"),
+        latitude=raw.get("latitude"),
+        longitude=raw.get("longitude"),
+        cnpj=raw.get("cnpj"),
+        data_atualizacao=raw.get("data_atualizacao"),
+    )
+
+
+async def buscar_estabelecimento_por_cnes(cnes: str) -> EstabelecimentoDetalhe | None:
+    """Fetch a single establishment by its CNES code.
+
+    API: GET /estabelecimentos/{cnes}
+
+    Args:
+        cnes: CNES code (7 digits).
+    """
+    url = f"{ESTABELECIMENTOS_URL}/{cnes}"
+    data: dict[str, Any] = await http_get(url)
+    if not data:
+        return None
+    return _parse_estabelecimento_detalhe(data)
+
+
+async def buscar_estabelecimentos_por_tipo(
+    *,
+    codigo_tipo: str,
+    codigo_municipio: str | None = None,
+    codigo_uf: str | None = None,
+    status: int = 1,
+    limit: int = DEFAULT_LIMIT,
+    offset: int = 0,
+) -> list[Estabelecimento]:
+    """Search establishments filtered by type code.
+
+    API: GET /estabelecimentos
+
+    Args:
+        codigo_tipo: Establishment type code (e.g. "73" for Pronto Atendimento).
+        codigo_municipio: IBGE municipality code.
+        codigo_uf: IBGE state code.
+        status: 1 for active, 0 for inactive.
+        limit: Max results per page.
+        offset: Pagination offset.
+    """
+    params: dict[str, Any] = {
+        "codigo_tipo_estabelecimento": codigo_tipo,
+        "status": status,
+        "limit": min(limit, MAX_LIMIT),
+        "offset": offset,
+    }
+    if codigo_municipio:
+        params["codigo_municipio"] = codigo_municipio
+    if codigo_uf:
+        params["codigo_uf"] = codigo_uf
+
+    data: list[dict[str, Any]] = await http_get(ESTABELECIMENTOS_URL, params=params)
+    return [_parse_estabelecimento(item) for item in data]

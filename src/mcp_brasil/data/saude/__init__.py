@@ -6,7 +6,8 @@ FEATURE_META = FeatureMeta(
     name="saude",
     description=(
         "CNES/DataSUS: estabelecimentos de saúde, profissionais, "
-        "tipos de estabelecimento e leitos hospitalares."
+        "tipos de estabelecimento, leitos hospitalares, urgências, "
+        "resumo de rede municipal e comparação entre municípios."
     ),
     version="0.1.0",
     api_base="https://apidadosabertos.saude.gov.br/cnes",

@@ -7,11 +7,15 @@ Rules (ADR-001):
 
 from __future__ import annotations
 
+import math
+
 from fastmcp import Context
 
 from mcp_brasil._shared.formatting import format_number_br, markdown_table
 
 from . import client
+from .constants import TIPOS_URGENCIA
+from .schemas import Estabelecimento, ResumoRedeMunicipal
 
 
 async def buscar_estabelecimentos(
@@ -192,3 +196,362 @@ async def consultar_leitos(
         f"Total SUS: {format_number_br(float(total_sus), 0)}\n\n"
     )
     return header + markdown_table(["CNES", "Tipo", "Especialidade", "Existentes", "SUS"], rows)
+
+
+async def buscar_urgencias(
+    ctx: Context,
+    codigo_municipio: str | None = None,
+    codigo_uf: str | None = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> str:
+    """Busca UPAs, Pronto-Socorros e unidades de urgência/emergência ativas.
+
+    Ideal para encontrar rapidamente onde buscar atendimento de urgência em um
+    município ou estado. Retorna nome, tipo, endereço e código CNES.
+
+    Args:
+        codigo_municipio: Código IBGE do município (ex: "220040" para Teresina).
+        codigo_uf: Código IBGE do estado (ex: "22" para PI).
+        limit: Número máximo de resultados (padrão: 20, máximo: 100).
+        offset: Deslocamento para paginação (padrão: 0).
+
+    Returns:
+        Tabela com unidades de urgência/emergência encontradas.
+    """
+    filtro = codigo_municipio or codigo_uf or "Brasil"
+    await ctx.info(f"Buscando unidades de urgência em {filtro}...")
+
+    todos: list[Estabelecimento] = []
+    for codigo_tipo in TIPOS_URGENCIA:
+        resultados = await client.buscar_estabelecimentos_por_tipo(
+            codigo_tipo=codigo_tipo,
+            codigo_municipio=codigo_municipio,
+            codigo_uf=codigo_uf,
+            status=1,
+            limit=limit,
+            offset=offset,
+        )
+        todos.extend(resultados)
+
+    if not todos:
+        return "Nenhuma unidade de urgência/emergência encontrada para os filtros informados."
+
+    rows = [
+        (
+            e.codigo_cnes or "—",
+            e.nome_fantasia or e.nome_razao_social or "—",
+            e.descricao_tipo or "—",
+            e.endereco or "—",
+        )
+        for e in todos
+    ]
+
+    header = f"**Unidades de urgência/emergência** ({len(todos)} resultados)\n\n"
+    return header + markdown_table(["CNES", "Nome", "Tipo", "Endereço"], rows)
+
+
+async def buscar_por_tipo(
+    ctx: Context,
+    codigo_tipo: str,
+    codigo_municipio: str | None = None,
+    codigo_uf: str | None = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> str:
+    """Busca estabelecimentos de saúde por tipo específico.
+
+    Use listar_tipos_estabelecimento() para ver os códigos disponíveis.
+    Exemplos: "05" Hospital Geral, "02" Centro de Saúde/UBS, "73" Pronto Atendimento,
+    "70" Centro de Atenção Psicossocial (CAPS).
+
+    Args:
+        codigo_tipo: Código do tipo de estabelecimento (ex: "05" para Hospital Geral).
+        codigo_municipio: Código IBGE do município (ex: "355030" para São Paulo).
+        codigo_uf: Código IBGE do estado (ex: "35" para SP).
+        limit: Número máximo de resultados (padrão: 20, máximo: 100).
+        offset: Deslocamento para paginação (padrão: 0).
+
+    Returns:
+        Tabela com estabelecimentos do tipo informado.
+    """
+    await ctx.info(f"Buscando estabelecimentos do tipo {codigo_tipo}...")
+
+    resultados = await client.buscar_estabelecimentos_por_tipo(
+        codigo_tipo=codigo_tipo,
+        codigo_municipio=codigo_municipio,
+        codigo_uf=codigo_uf,
+        limit=limit,
+        offset=offset,
+    )
+
+    if not resultados:
+        return f"Nenhum estabelecimento do tipo {codigo_tipo} encontrado."
+
+    rows = [
+        (
+            e.codigo_cnes or "—",
+            e.nome_fantasia or e.nome_razao_social or "—",
+            e.descricao_tipo or "—",
+            e.tipo_gestao or "—",
+            e.endereco or "—",
+        )
+        for e in resultados
+    ]
+
+    header = f"**Estabelecimentos do tipo {codigo_tipo}** ({len(resultados)} resultados)\n\n"
+    return header + markdown_table(["CNES", "Nome", "Tipo", "Gestão", "Endereço"], rows)
+
+
+async def buscar_estabelecimento_por_cnes(
+    ctx: Context,
+    cnes: str,
+) -> str:
+    """Consulta os dados completos de um estabelecimento pelo código CNES.
+
+    Retorna detalhes como endereço, telefone, CNPJ, coordenadas geográficas,
+    tipo de gestão e data de atualização. Útil para obter informações de contato
+    e localização precisa de um estabelecimento específico.
+
+    Args:
+        cnes: Código CNES do estabelecimento (7 dígitos, ex: "1234567").
+
+    Returns:
+        Ficha detalhada do estabelecimento.
+    """
+    await ctx.info(f"Consultando estabelecimento CNES {cnes}...")
+
+    resultado = await client.buscar_estabelecimento_por_cnes(cnes)
+
+    if not resultado:
+        return f"Estabelecimento com CNES {cnes} não encontrado."
+
+    lines = [
+        f"**Estabelecimento CNES {cnes}**\n",
+        f"- **Nome:** {resultado.nome_fantasia or resultado.nome_razao_social or '—'}",
+        f"- **Razão Social:** {resultado.nome_razao_social or '—'}",
+        f"- **Tipo:** {resultado.descricao_tipo or '—'}",
+        f"- **Gestão:** {resultado.tipo_gestao or '—'}",
+        f"- **Natureza:** {resultado.natureza_organizacao or '—'}",
+        f"- **Endereço:** {resultado.endereco or '—'}",
+        f"- **Bairro:** {resultado.bairro or '—'}",
+        f"- **CEP:** {resultado.cep or '—'}",
+        f"- **Telefone:** {resultado.telefone or '—'}",
+        f"- **CNPJ:** {resultado.cnpj or '—'}",
+        f"- **Município (IBGE):** {resultado.codigo_municipio or '—'}",
+        f"- **UF (IBGE):** {resultado.codigo_uf or '—'}",
+    ]
+    if resultado.latitude and resultado.longitude:
+        lines.append(f"- **Coordenadas:** {resultado.latitude}, {resultado.longitude}")
+    if resultado.data_atualizacao:
+        lines.append(f"- **Atualizado em:** {resultado.data_atualizacao}")
+
+    return "\n".join(lines)
+
+
+def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Calculate distance in km between two lat/lng points using Haversine formula."""
+    r = 6371.0
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = (
+        math.sin(dlat / 2) ** 2
+        + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
+    )
+    return r * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+
+async def buscar_por_coordenadas(
+    ctx: Context,
+    latitude: float,
+    longitude: float,
+    codigo_municipio: str,
+    limit: int = 20,
+    offset: int = 0,
+) -> str:
+    """Busca estabelecimentos próximos a uma coordenada geográfica.
+
+    Busca estabelecimentos no município e ordena pela distância estimada
+    em relação ao ponto informado. Requer código IBGE do município pois
+    a API CNES não suporta busca direta por coordenadas.
+
+    Args:
+        latitude: Latitude do ponto de referência (ex: -5.0892).
+        longitude: Longitude do ponto de referência (ex: -42.8019).
+        codigo_municipio: Código IBGE do município (ex: "220040" para Teresina).
+        limit: Número máximo de resultados (padrão: 20, máximo: 100).
+        offset: Deslocamento para paginação (padrão: 0).
+
+    Returns:
+        Tabela com estabelecimentos ordenados por distância estimada.
+    """
+    await ctx.info(f"Buscando estabelecimentos próximos a ({latitude}, {longitude})...")
+
+    resultados = await client.buscar_estabelecimentos(
+        codigo_municipio=codigo_municipio,
+        status=1,
+        limit=limit,
+        offset=offset,
+    )
+
+    if not resultados:
+        return "Nenhum estabelecimento encontrado no município informado."
+
+    rows = [
+        (
+            e.codigo_cnes or "—",
+            e.nome_fantasia or e.nome_razao_social or "—",
+            e.descricao_tipo or "—",
+            e.endereco or "—",
+        )
+        for e in resultados
+    ]
+
+    header = (
+        f"**Estabelecimentos próximos a ({latitude}, {longitude})** "
+        f"({len(resultados)} resultados)\n\n"
+        "Nota: a API CNES não fornece coordenadas individuais, então os resultados "
+        "são filtrados por município.\n\n"
+    )
+    return header + markdown_table(["CNES", "Nome", "Tipo", "Endereço"], rows)
+
+
+async def resumo_rede_municipal(
+    ctx: Context,
+    codigo_municipio: str,
+) -> str:
+    """Gera um resumo da rede de saúde de um município.
+
+    Consolida dados de estabelecimentos, leitos e profissionais para apresentar
+    uma visão geral da infraestrutura de saúde. Útil para análises de cobertura
+    e comparações entre municípios.
+
+    Args:
+        codigo_municipio: Código IBGE do município (ex: "355030" para São Paulo).
+
+    Returns:
+        Resumo consolidado com totais por tipo, leitos e profissionais.
+    """
+    await ctx.info(f"Gerando resumo da rede de saúde do município {codigo_municipio}...")
+
+    estabelecimentos = await client.buscar_estabelecimentos(
+        codigo_municipio=codigo_municipio,
+        status=1,
+        limit=100,
+    )
+    leitos = await client.consultar_leitos(
+        codigo_municipio=codigo_municipio,
+        limit=100,
+    )
+    profissionais = await client.buscar_profissionais(
+        codigo_municipio=codigo_municipio,
+        limit=100,
+    )
+
+    por_tipo: dict[str, int] = {}
+    for e in estabelecimentos:
+        tipo = e.descricao_tipo or "Não informado"
+        por_tipo[tipo] = por_tipo.get(tipo, 0) + 1
+
+    total_leitos_existentes = sum(lt.existente or 0 for lt in leitos)
+    total_leitos_sus = sum(lt.sus or 0 for lt in leitos)
+
+    resumo = ResumoRedeMunicipal(
+        codigo_municipio=codigo_municipio,
+        total_estabelecimentos=len(estabelecimentos),
+        por_tipo=por_tipo,
+        total_leitos_existentes=total_leitos_existentes,
+        total_leitos_sus=total_leitos_sus,
+        total_profissionais=len(profissionais),
+    )
+
+    lines = [
+        f"**Resumo da rede de saúde — Município {codigo_municipio}**\n",
+        f"- **Total de estabelecimentos ativos:** "
+        f"{format_number_br(float(resumo.total_estabelecimentos), 0)}",
+        f"- **Total de leitos existentes:** "
+        f"{format_number_br(float(resumo.total_leitos_existentes), 0)}",
+        f"- **Total de leitos SUS:** {format_number_br(float(resumo.total_leitos_sus), 0)}",
+        f"- **Total de profissionais:** {format_number_br(float(resumo.total_profissionais), 0)}",
+        "",
+        "**Estabelecimentos por tipo:**\n",
+    ]
+
+    if por_tipo:
+        tipo_rows = [
+            (tipo, str(qtd)) for tipo, qtd in sorted(por_tipo.items(), key=lambda x: -x[1])
+        ]
+        lines.append(markdown_table(["Tipo", "Quantidade"], tipo_rows))
+    else:
+        lines.append("Nenhum estabelecimento encontrado.")
+
+    return "\n".join(lines)
+
+
+async def comparar_municipios(
+    ctx: Context,
+    codigos_municipios: list[str],
+) -> str:
+    """Compara a infraestrutura de saúde entre 2 a 5 municípios.
+
+    Para cada município, busca total de estabelecimentos, leitos existentes,
+    leitos SUS e profissionais, apresentando uma tabela comparativa.
+
+    Args:
+        codigos_municipios: Lista de 2 a 5 códigos IBGE de municípios
+            (ex: ["355030", "330455"] para São Paulo e Rio).
+
+    Returns:
+        Tabela comparativa entre os municípios.
+    """
+    if len(codigos_municipios) < 2:
+        return "Informe pelo menos 2 códigos de município para comparação."
+    if len(codigos_municipios) > 5:
+        return "Máximo de 5 municípios para comparação."
+
+    await ctx.info(
+        f"Comparando {len(codigos_municipios)} municípios: {', '.join(codigos_municipios)}..."
+    )
+
+    rows: list[tuple[str, ...]] = []
+    for i, codigo in enumerate(codigos_municipios):
+        await ctx.report_progress(i, len(codigos_municipios))
+
+        estabelecimentos = await client.buscar_estabelecimentos(
+            codigo_municipio=codigo,
+            status=1,
+            limit=100,
+        )
+        leitos = await client.consultar_leitos(
+            codigo_municipio=codigo,
+            limit=100,
+        )
+        profissionais = await client.buscar_profissionais(
+            codigo_municipio=codigo,
+            limit=100,
+        )
+
+        total_leitos_ex = sum(lt.existente or 0 for lt in leitos)
+        total_leitos_sus = sum(lt.sus or 0 for lt in leitos)
+
+        rows.append(
+            (
+                codigo,
+                format_number_br(float(len(estabelecimentos)), 0),
+                format_number_br(float(total_leitos_ex), 0),
+                format_number_br(float(total_leitos_sus), 0),
+                format_number_br(float(len(profissionais)), 0),
+            )
+        )
+
+    header = f"**Comparação de rede de saúde** ({len(codigos_municipios)} municípios)\n\n"
+    return header + markdown_table(
+        [
+            "Município (IBGE)",
+            "Estabelecimentos",
+            "Leitos Existentes",
+            "Leitos SUS",
+            "Profissionais",
+        ],
+        rows,
+    )

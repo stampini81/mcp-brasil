@@ -11,6 +11,7 @@ import pytest
 from mcp_brasil.data.saude import tools
 from mcp_brasil.data.saude.schemas import (
     Estabelecimento,
+    EstabelecimentoDetalhe,
     Leito,
     Profissional,
     TipoEstabelecimento,
@@ -224,3 +225,276 @@ class TestConsultarLeitos:
         ):
             result = await tools.consultar_leitos(ctx)
         assert "—" in result
+
+
+# ---------------------------------------------------------------------------
+# buscar_urgencias
+# ---------------------------------------------------------------------------
+
+
+class TestBuscarUrgencias:
+    @pytest.mark.asyncio
+    async def test_formats_table(self) -> None:
+        mock_data = [
+            Estabelecimento(
+                codigo_cnes="9876543",
+                nome_fantasia="UPA 24h Norte",
+                descricao_tipo="Pronto Atendimento",
+                endereco="Av Norte, 100",
+            ),
+        ]
+        ctx = _mock_ctx()
+        with patch(
+            f"{CLIENT_MODULE}.buscar_estabelecimentos_por_tipo",
+            new_callable=AsyncMock,
+            return_value=mock_data,
+        ):
+            result = await tools.buscar_urgencias(ctx, codigo_municipio="220040")
+        assert "UPA 24h Norte" in result
+        assert "Pronto Atendimento" in result
+
+    @pytest.mark.asyncio
+    async def test_empty(self) -> None:
+        ctx = _mock_ctx()
+        with patch(
+            f"{CLIENT_MODULE}.buscar_estabelecimentos_por_tipo",
+            new_callable=AsyncMock,
+            return_value=[],
+        ):
+            result = await tools.buscar_urgencias(ctx)
+        assert "Nenhuma unidade de urgência" in result
+
+
+# ---------------------------------------------------------------------------
+# buscar_por_tipo
+# ---------------------------------------------------------------------------
+
+
+class TestBuscarPorTipo:
+    @pytest.mark.asyncio
+    async def test_formats_table(self) -> None:
+        mock_data = [
+            Estabelecimento(
+                codigo_cnes="1111111",
+                nome_fantasia="Hospital Regional",
+                descricao_tipo="Hospital Geral",
+                tipo_gestao="Estadual",
+                endereco="Rua Hospital, 1",
+            ),
+        ]
+        ctx = _mock_ctx()
+        with patch(
+            f"{CLIENT_MODULE}.buscar_estabelecimentos_por_tipo",
+            new_callable=AsyncMock,
+            return_value=mock_data,
+        ):
+            result = await tools.buscar_por_tipo(ctx, codigo_tipo="05")
+        assert "Hospital Regional" in result
+        assert "1 resultados" in result
+
+    @pytest.mark.asyncio
+    async def test_empty(self) -> None:
+        ctx = _mock_ctx()
+        with patch(
+            f"{CLIENT_MODULE}.buscar_estabelecimentos_por_tipo",
+            new_callable=AsyncMock,
+            return_value=[],
+        ):
+            result = await tools.buscar_por_tipo(ctx, codigo_tipo="99")
+        assert "Nenhum estabelecimento do tipo 99" in result
+
+
+# ---------------------------------------------------------------------------
+# buscar_estabelecimento_por_cnes
+# ---------------------------------------------------------------------------
+
+
+class TestBuscarEstabelecimentoPorCnes:
+    @pytest.mark.asyncio
+    async def test_formats_detail(self) -> None:
+        mock_data = EstabelecimentoDetalhe(
+            codigo_cnes="1234567",
+            nome_fantasia="Hospital São Paulo",
+            nome_razao_social="Hospital São Paulo Ltda",
+            descricao_tipo="Hospital Geral",
+            tipo_gestao="Estadual",
+            natureza_organizacao="Administração Pública",
+            endereco="Rua Napoleão de Barros, 715",
+            bairro="Vila Clementino",
+            cep="04024-002",
+            telefone="(11) 5576-4000",
+            cnpj="12.345.678/0001-90",
+            codigo_municipio="355030",
+            codigo_uf="35",
+            latitude=-23.5989,
+            longitude=-46.6423,
+            data_atualizacao="2024-01-15",
+        )
+        ctx = _mock_ctx()
+        with patch(
+            f"{CLIENT_MODULE}.buscar_estabelecimento_por_cnes",
+            new_callable=AsyncMock,
+            return_value=mock_data,
+        ):
+            result = await tools.buscar_estabelecimento_por_cnes(ctx, cnes="1234567")
+        assert "Hospital São Paulo" in result
+        assert "(11) 5576-4000" in result
+        assert "-23.5989" in result
+        assert "2024-01-15" in result
+
+    @pytest.mark.asyncio
+    async def test_not_found(self) -> None:
+        ctx = _mock_ctx()
+        with patch(
+            f"{CLIENT_MODULE}.buscar_estabelecimento_por_cnes",
+            new_callable=AsyncMock,
+            return_value=None,
+        ):
+            result = await tools.buscar_estabelecimento_por_cnes(ctx, cnes="0000000")
+        assert "não encontrado" in result
+
+
+# ---------------------------------------------------------------------------
+# buscar_por_coordenadas
+# ---------------------------------------------------------------------------
+
+
+class TestBuscarPorCoordenadas:
+    @pytest.mark.asyncio
+    async def test_formats_table(self) -> None:
+        mock_data = [
+            Estabelecimento(
+                codigo_cnes="2222222",
+                nome_fantasia="UBS Próxima",
+                descricao_tipo="Centro de Saúde/UBS",
+                endereco="Rua Perto, 50",
+            ),
+        ]
+        ctx = _mock_ctx()
+        with patch(
+            f"{CLIENT_MODULE}.buscar_estabelecimentos",
+            new_callable=AsyncMock,
+            return_value=mock_data,
+        ):
+            result = await tools.buscar_por_coordenadas(
+                ctx,
+                latitude=-5.0892,
+                longitude=-42.8019,
+                codigo_municipio="220040",
+            )
+        assert "UBS Próxima" in result
+
+    @pytest.mark.asyncio
+    async def test_empty(self) -> None:
+        ctx = _mock_ctx()
+        with patch(
+            f"{CLIENT_MODULE}.buscar_estabelecimentos",
+            new_callable=AsyncMock,
+            return_value=[],
+        ):
+            result = await tools.buscar_por_coordenadas(
+                ctx,
+                latitude=-5.0,
+                longitude=-42.0,
+                codigo_municipio="220040",
+            )
+        assert "Nenhum estabelecimento" in result
+
+
+# ---------------------------------------------------------------------------
+# resumo_rede_municipal
+# ---------------------------------------------------------------------------
+
+
+class TestResumoRedeMunicipal:
+    @pytest.mark.asyncio
+    async def test_formats_summary(self) -> None:
+        mock_estab = [
+            Estabelecimento(descricao_tipo="Hospital Geral"),
+            Estabelecimento(descricao_tipo="Hospital Geral"),
+            Estabelecimento(descricao_tipo="Centro de Saúde/UBS"),
+        ]
+        mock_leitos = [
+            Leito(existente=20, sus=15),
+            Leito(existente=30, sus=25),
+        ]
+        mock_prof = [
+            Profissional(nome="Dr. A"),
+            Profissional(nome="Dr. B"),
+        ]
+        ctx = _mock_ctx()
+        with (
+            patch(
+                f"{CLIENT_MODULE}.buscar_estabelecimentos",
+                new_callable=AsyncMock,
+                return_value=mock_estab,
+            ),
+            patch(
+                f"{CLIENT_MODULE}.consultar_leitos",
+                new_callable=AsyncMock,
+                return_value=mock_leitos,
+            ),
+            patch(
+                f"{CLIENT_MODULE}.buscar_profissionais",
+                new_callable=AsyncMock,
+                return_value=mock_prof,
+            ),
+        ):
+            result = await tools.resumo_rede_municipal(ctx, codigo_municipio="355030")
+        assert "Resumo da rede de saúde" in result
+        assert "Hospital Geral" in result
+        assert "Centro de Saúde/UBS" in result
+
+
+# ---------------------------------------------------------------------------
+# comparar_municipios
+# ---------------------------------------------------------------------------
+
+
+class TestCompararMunicipios:
+    @pytest.mark.asyncio
+    async def test_formats_comparison(self) -> None:
+        ctx = _mock_ctx()
+        ctx.report_progress = AsyncMock()
+        mock_estab = [Estabelecimento()]
+        mock_leitos = [Leito(existente=10, sus=8)]
+        mock_prof = [Profissional(nome="Dr. X")]
+        with (
+            patch(
+                f"{CLIENT_MODULE}.buscar_estabelecimentos",
+                new_callable=AsyncMock,
+                return_value=mock_estab,
+            ),
+            patch(
+                f"{CLIENT_MODULE}.consultar_leitos",
+                new_callable=AsyncMock,
+                return_value=mock_leitos,
+            ),
+            patch(
+                f"{CLIENT_MODULE}.buscar_profissionais",
+                new_callable=AsyncMock,
+                return_value=mock_prof,
+            ),
+        ):
+            result = await tools.comparar_municipios(
+                ctx,
+                codigos_municipios=["355030", "330455"],
+            )
+        assert "Comparação" in result
+        assert "355030" in result
+        assert "330455" in result
+
+    @pytest.mark.asyncio
+    async def test_less_than_2(self) -> None:
+        ctx = _mock_ctx()
+        result = await tools.comparar_municipios(ctx, codigos_municipios=["355030"])
+        assert "pelo menos 2" in result
+
+    @pytest.mark.asyncio
+    async def test_more_than_5(self) -> None:
+        ctx = _mock_ctx()
+        result = await tools.comparar_municipios(
+            ctx,
+            codigos_municipios=["1", "2", "3", "4", "5", "6"],
+        )
+        assert "Máximo de 5" in result

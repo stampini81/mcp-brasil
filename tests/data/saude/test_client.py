@@ -253,3 +253,127 @@ class TestParseLeito:
         assert result.codigo_cnes == ""
         assert result.existente is None
         assert result.sus is None
+
+
+# ---------------------------------------------------------------------------
+# buscar_estabelecimento_por_cnes
+# ---------------------------------------------------------------------------
+
+
+class TestBuscarEstabelecimentoPorCnes:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_returns_parsed_detail(self) -> None:
+        respx.get(f"{ESTABELECIMENTOS_URL}/1234567").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "codigo_cnes": "1234567",
+                    "nome_fantasia": "Hospital São Paulo",
+                    "nome_razao_social": "Hospital São Paulo Ltda",
+                    "natureza_organizacao": "Administração Pública",
+                    "tipo_gestao": "Estadual",
+                    "codigo_tipo_estabelecimento": "05",
+                    "descricao_tipo_estabelecimento": "Hospital Geral",
+                    "codigo_municipio": "355030",
+                    "codigo_uf": "35",
+                    "endereco": "Rua Napoleão de Barros, 715",
+                    "bairro": "Vila Clementino",
+                    "cep": "04024-002",
+                    "telefone": "(11) 5576-4000",
+                    "latitude": -23.5989,
+                    "longitude": -46.6423,
+                    "cnpj": "12.345.678/0001-90",
+                    "data_atualizacao": "2024-01-15",
+                },
+            )
+        )
+        result = await client.buscar_estabelecimento_por_cnes("1234567")
+        assert result is not None
+        assert result.codigo_cnes == "1234567"
+        assert result.nome_fantasia == "Hospital São Paulo"
+        assert result.telefone == "(11) 5576-4000"
+        assert result.latitude == -23.5989
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_returns_none_for_empty(self) -> None:
+        respx.get(f"{ESTABELECIMENTOS_URL}/0000000").mock(
+            return_value=httpx.Response(200, json={})
+        )
+        result = await client.buscar_estabelecimento_por_cnes("0000000")
+        assert result is None
+
+
+# ---------------------------------------------------------------------------
+# buscar_estabelecimentos_por_tipo
+# ---------------------------------------------------------------------------
+
+
+class TestBuscarEstabelecimentosPorTipo:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_sends_tipo_param(self) -> None:
+        route = respx.get(ESTABELECIMENTOS_URL).mock(return_value=httpx.Response(200, json=[]))
+        await client.buscar_estabelecimentos_por_tipo(
+            codigo_tipo="73",
+            codigo_municipio="355030",
+        )
+        req_url = str(route.calls[0].request.url)
+        assert "codigo_tipo_estabelecimento=73" in req_url
+        assert "codigo_municipio=355030" in req_url
+        assert "status=1" in req_url
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_returns_parsed_list(self) -> None:
+        respx.get(ESTABELECIMENTOS_URL).mock(
+            return_value=httpx.Response(
+                200,
+                json=[
+                    {
+                        "codigo_cnes": "9876543",
+                        "nome_fantasia": "UPA 24h",
+                        "codigo_tipo_estabelecimento": "73",
+                        "descricao_tipo_estabelecimento": "Pronto Atendimento",
+                        "codigo_municipio": "220040",
+                        "codigo_uf": "22",
+                    }
+                ],
+            )
+        )
+        result = await client.buscar_estabelecimentos_por_tipo(codigo_tipo="73")
+        assert len(result) == 1
+        assert result[0].codigo_cnes == "9876543"
+        assert result[0].descricao_tipo == "Pronto Atendimento"
+
+
+# ---------------------------------------------------------------------------
+# Parse detail function
+# ---------------------------------------------------------------------------
+
+
+class TestParseEstabelecimentoDetalhe:
+    def test_handles_missing_fields(self) -> None:
+        result = client._parse_estabelecimento_detalhe({})
+        assert result.codigo_cnes == ""
+        assert result.telefone is None
+        assert result.latitude is None
+
+    def test_parses_all_fields(self) -> None:
+        result = client._parse_estabelecimento_detalhe(
+            {
+                "codigo_cnes": 1234567,
+                "nome_fantasia": "Hospital X",
+                "bairro": "Centro",
+                "cep": "01000-000",
+                "telefone": "1199999999",
+                "latitude": -23.55,
+                "longitude": -46.63,
+                "cnpj": "12345678000190",
+                "data_atualizacao": "2024-06-01",
+            }
+        )
+        assert result.codigo_cnes == "1234567"
+        assert result.bairro == "Centro"
+        assert result.latitude == -23.55
