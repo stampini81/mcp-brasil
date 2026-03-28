@@ -326,14 +326,13 @@ class TestConsultarOrgao:
             new_callable=AsyncMock,
             return_value=mock_data,
         ):
-            result = await tools.consultar_orgao(ctx, texto="educação")
+            result = await tools.consultar_orgao(cnpj="00394460000141", ctx=ctx)
         assert "Ministério da Educação" in result
         assert "00394460000141" in result
         assert "Federal" in result
         assert "Executivo" in result
         assert "DF" in result
         assert "Brasília" in result
-        assert "1 órgãos" in result
 
     @pytest.mark.asyncio
     async def test_empty_results(self) -> None:
@@ -344,15 +343,14 @@ class TestConsultarOrgao:
             new_callable=AsyncMock,
             return_value=mock_data,
         ):
-            result = await tools.consultar_orgao(ctx, texto="xyzinexistente")
+            result = await tools.consultar_orgao(cnpj="99999999999999", ctx=ctx)
         assert "Nenhum órgão encontrado" in result
-        assert "xyzinexistente" in result
 
     @pytest.mark.asyncio
-    async def test_missing_filter_validation(self) -> None:
+    async def test_invalid_cnpj_validation(self) -> None:
         ctx = _mock_ctx()
-        result = await tools.consultar_orgao(ctx)
-        assert "Informe pelo menos um filtro" in result
+        result = await tools.consultar_orgao(cnpj="123", ctx=ctx)
+        assert "CNPJ inválido" in result
 
 
 # ---------------------------------------------------------------------------

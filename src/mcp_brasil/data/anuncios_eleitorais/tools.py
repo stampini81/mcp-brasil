@@ -8,13 +8,30 @@ Rules (ADR-001):
 
 from __future__ import annotations
 
+import logging
+
 from fastmcp import Context
 
 from mcp_brasil._shared.formatting import markdown_table
+from mcp_brasil.exceptions import HttpClientError
 
 from . import client
 from .constants import BUSCA_FRASE_EXATA
 from .schemas import AnuncioEleitoral
+
+logger = logging.getLogger(__name__)
+
+_TOKEN_AUSENTE = (
+    "Token da Meta não configurado. Defina a variável de ambiente "
+    "META_ACCESS_TOKEN ou META_AD_LIBRARY_TOKEN com um token válido. "
+    "Obtenha em: https://developers.facebook.com/tools/explorer/"
+)
+
+_TOKEN_EXPIRADO = (
+    "Token da Meta expirado ou inválido. Gere um novo token em: "
+    "https://developers.facebook.com/tools/explorer/ e atualize a variável "
+    "META_ACCESS_TOKEN ou META_AD_LIBRARY_TOKEN."
+)
 
 
 def _formatar_anuncio(ad: AnuncioEleitoral) -> str:
@@ -130,7 +147,13 @@ async def buscar_anuncios_eleitorais(
     }
     if search_type is not None:
         kwargs["search_type"] = search_type
-    resposta = await client.buscar_anuncios(**kwargs)  # type: ignore[arg-type]
+    try:
+        resposta = await client.buscar_anuncios(**kwargs)  # type: ignore[arg-type]
+    except RuntimeError:
+        return _TOKEN_AUSENTE
+    except HttpClientError as exc:
+        logger.warning("buscar_anuncios_eleitorais failed: %s", exc)
+        return _TOKEN_EXPIRADO
     return _formatar_lista_anuncios(resposta.data)
 
 
@@ -159,13 +182,19 @@ async def buscar_anuncios_por_pagina(
         Lista formatada de anúncios da(s) página(s) com dados de gastos e alcance.
     """
     await ctx.info(f"Buscando anúncios das páginas: {', '.join(search_page_ids)}...")
-    resposta = await client.buscar_anuncios(
-        search_page_ids=search_page_ids,
-        ad_active_status=ad_active_status,
-        ad_delivery_date_min=ad_delivery_date_min,
-        ad_delivery_date_max=ad_delivery_date_max,
-        limit=limit,
-    )
+    try:
+        resposta = await client.buscar_anuncios(
+            search_page_ids=search_page_ids,
+            ad_active_status=ad_active_status,
+            ad_delivery_date_min=ad_delivery_date_min,
+            ad_delivery_date_max=ad_delivery_date_max,
+            limit=limit,
+        )
+    except RuntimeError:
+        return _TOKEN_AUSENTE
+    except HttpClientError as exc:
+        logger.warning("buscar_anuncios_por_pagina failed: %s", exc)
+        return _TOKEN_EXPIRADO
     return _formatar_lista_anuncios(resposta.data)
 
 
@@ -196,14 +225,20 @@ async def buscar_anuncios_por_financiador(
         Lista formatada de anúncios do(s) financiador(es).
     """
     await ctx.info(f"Buscando anúncios financiados por: {', '.join(bylines)}...")
-    resposta = await client.buscar_anuncios(
-        search_terms=search_terms,
-        bylines=bylines,
-        ad_active_status=ad_active_status,
-        ad_delivery_date_min=ad_delivery_date_min,
-        ad_delivery_date_max=ad_delivery_date_max,
-        limit=limit,
-    )
+    try:
+        resposta = await client.buscar_anuncios(
+            search_terms=search_terms,
+            bylines=bylines,
+            ad_active_status=ad_active_status,
+            ad_delivery_date_min=ad_delivery_date_min,
+            ad_delivery_date_max=ad_delivery_date_max,
+            limit=limit,
+        )
+    except RuntimeError:
+        return _TOKEN_AUSENTE
+    except HttpClientError as exc:
+        logger.warning("buscar_anuncios_por_financiador failed: %s", exc)
+        return _TOKEN_EXPIRADO
     return _formatar_lista_anuncios(resposta.data)
 
 
@@ -237,13 +272,19 @@ async def buscar_anuncios_por_regiao(
     """
     termo = search_terms or regiao
     await ctx.info(f"Buscando anúncios com alcance em {regiao}...")
-    resposta = await client.buscar_anuncios(
-        search_terms=termo,
-        ad_active_status=ad_active_status,
-        ad_delivery_date_min=ad_delivery_date_min,
-        ad_delivery_date_max=ad_delivery_date_max,
-        limit=limit,
-    )
+    try:
+        resposta = await client.buscar_anuncios(
+            search_terms=termo,
+            ad_active_status=ad_active_status,
+            ad_delivery_date_min=ad_delivery_date_min,
+            ad_delivery_date_max=ad_delivery_date_max,
+            limit=limit,
+        )
+    except RuntimeError:
+        return _TOKEN_AUSENTE
+    except HttpClientError as exc:
+        logger.warning("buscar_anuncios_por_regiao failed: %s", exc)
+        return _TOKEN_EXPIRADO
 
     # Filtrar pós-busca: anúncios com alcance na região
     regiao_lower = regiao.lower()
@@ -293,13 +334,19 @@ async def analisar_demografia_anuncios(
         Análise demográfica e regional formatada.
     """
     await ctx.info(f"Analisando demografia dos anúncios: '{search_terms}'...")
-    resposta = await client.buscar_anuncios(
-        search_terms=search_terms,
-        search_page_ids=search_page_ids,
-        ad_delivery_date_min=ad_delivery_date_min,
-        ad_delivery_date_max=ad_delivery_date_max,
-        limit=limit,
-    )
+    try:
+        resposta = await client.buscar_anuncios(
+            search_terms=search_terms,
+            search_page_ids=search_page_ids,
+            ad_delivery_date_min=ad_delivery_date_min,
+            ad_delivery_date_max=ad_delivery_date_max,
+            limit=limit,
+        )
+    except RuntimeError:
+        return _TOKEN_AUSENTE
+    except HttpClientError as exc:
+        logger.warning("analisar_demografia_anuncios failed: %s", exc)
+        return _TOKEN_EXPIRADO
 
     if not resposta.data:
         return "Nenhum anúncio encontrado para análise demográfica."
@@ -381,12 +428,18 @@ async def buscar_anuncios_frase_exata(
         Lista formatada de anúncios eleitorais que contêm a frase exata.
     """
     await ctx.info(f"Buscando anúncios com frase exata: '{frase}'...")
-    resposta = await client.buscar_anuncios(
-        search_terms=frase,
-        search_type=BUSCA_FRASE_EXATA,
-        ad_active_status=ad_active_status,
-        ad_delivery_date_min=ad_delivery_date_min,
-        ad_delivery_date_max=ad_delivery_date_max,
-        limit=limit,
-    )
+    try:
+        resposta = await client.buscar_anuncios(
+            search_terms=frase,
+            search_type=BUSCA_FRASE_EXATA,
+            ad_active_status=ad_active_status,
+            ad_delivery_date_min=ad_delivery_date_min,
+            ad_delivery_date_max=ad_delivery_date_max,
+            limit=limit,
+        )
+    except RuntimeError:
+        return _TOKEN_AUSENTE
+    except HttpClientError as exc:
+        logger.warning("buscar_anuncios_frase_exata failed: %s", exc)
+        return _TOKEN_EXPIRADO
     return _formatar_lista_anuncios(resposta.data)

@@ -355,13 +355,19 @@ def _parse_fornecedor(item: dict[str, Any]) -> Fornecedor:
     )
 
 
+_ESFERA_MAP: dict[str, str] = {"F": "Federal", "E": "Estadual", "M": "Municipal", "D": "Distrital"}
+_PODER_MAP: dict[str, str] = {"E": "Executivo", "L": "Legislativo", "J": "Judiciário"}
+
+
 def _parse_orgao(item: dict[str, Any]) -> OrgaoContratante:
     """Parse a raw API response item into an OrgaoContratante model."""
+    esfera_id = item.get("esferaId") or ""
+    poder_id = item.get("poderId") or ""
     return OrgaoContratante(
         cnpj=item.get("cnpj"),
         razao_social=item.get("razaoSocial"),
-        esfera=item.get("esferaNome") or item.get("esferaId"),
-        poder=item.get("poderNome") or item.get("poderId"),
+        esfera=item.get("esferaNome") or _ESFERA_MAP.get(esfera_id, esfera_id),
+        poder=item.get("poderNome") or _PODER_MAP.get(poder_id, poder_id),
         uf=item.get("ufSigla") or item.get("ufNome"),
         municipio=item.get("municipioNome"),
     )
@@ -379,25 +385,23 @@ async def consultar_fornecedor(cnpj: str) -> FornecedorResultado:
     )
 
 
-async def consultar_orgao(
-    query: str | None = None,
-    uf: str | None = None,
-    pagina: int = 1,
-    tamanho: int = 10,
-) -> OrgaoResultado:
-    """Search contracting bodies."""
-    params: dict[str, str] = {"pagina": str(pagina), "tamanhoPagina": str(tamanho)}
-    if query:
-        params["q"] = query
-    if uf:
-        params["uf"] = uf
-    data: dict[str, Any] = await http_get(ORGAOS_URL, params=params)
-    items = data.get("data", data.get("resultado", []))
-    orgaos = [_parse_orgao(item) for item in items] if isinstance(items, list) else []
-    return OrgaoResultado(
-        total=data.get("totalRegistros", data.get("count", len(orgaos))),
-        orgaos=orgaos,
-    )
+async def consultar_orgao(cnpj: str) -> OrgaoResultado:
+    """Fetch a contracting body by CNPJ.
+
+    The PNCP API only supports lookup by exact CNPJ at /api/pncp/v1/orgaos/{cnpj}.
+    Text search is not available in the API.
+    """
+    from mcp_brasil.exceptions import HttpClientError
+
+    url = f"{ORGAOS_URL}/{cnpj}"
+    try:
+        data: dict[str, Any] = await http_get(url)
+    except HttpClientError:
+        return OrgaoResultado(total=0, orgaos=[])
+    if isinstance(data, dict) and data.get("cnpj"):
+        orgao = _parse_orgao(data)
+        return OrgaoResultado(total=1, orgaos=[orgao])
+    return OrgaoResultado(total=0, orgaos=[])
 
 
 async def buscar_contratacoes_abertas(

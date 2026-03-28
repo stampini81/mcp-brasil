@@ -293,49 +293,42 @@ async def consultar_fornecedor(cnpj: str, ctx: Context) -> str:
 
 
 async def consultar_orgao(
+    cnpj: str,
     ctx: Context,
-    texto: str | None = None,
-    uf: str | None = None,
-    pagina: int = 1,
 ) -> str:
-    """Busca órgãos contratantes no PNCP.
+    """Consulta um órgão contratante no PNCP pelo CNPJ.
 
-    Pesquisa órgãos públicos que realizam contratações. Útil para
-    encontrar o CNPJ de um órgão específico para filtrar outras buscas.
+    Retorna dados cadastrais do órgão público que realiza contratações.
+    Útil para verificar informações de um órgão antes de filtrar
+    contratações, contratos ou atas.
+
+    NOTA: A API PNCP só permite consulta por CNPJ exato. Para descobrir
+    o CNPJ de um órgão, use a tool de buscar_contratacoes e observe
+    o campo orgao_cnpj nos resultados.
 
     Args:
-        texto: Nome do órgão (parcial ou completo).
-        uf: UF do órgão (ex: SP, RJ, DF).
-        pagina: Página de resultados (padrão 1).
+        cnpj: CNPJ do órgão contratante (14 dígitos, com ou sem formatação).
 
     Returns:
-        Lista de órgãos encontrados.
+        Dados cadastrais do órgão encontrado.
     """
-    if not any([texto, uf]):
-        return "Informe pelo menos um filtro: texto ou uf."
+    cnpj_limpo = cnpj.replace(".", "").replace("/", "").replace("-", "").strip()
+    if not cnpj_limpo.isdigit() or len(cnpj_limpo) != 14:
+        return f"CNPJ inválido: '{cnpj}'. Informe 14 dígitos numéricos."
 
-    desc = texto or uf or "órgãos"
-    await ctx.info(f"Buscando órgãos '{desc}'...")
-    resultado = await client.consultar_orgao(query=texto, uf=uf, pagina=pagina)
-    await ctx.info(f"{resultado.total} órgãos encontrados")
+    await ctx.info(f"Consultando órgão CNPJ {cnpj_limpo}...")
+    resultado = await client.consultar_orgao(cnpj=cnpj_limpo)
 
     if not resultado.orgaos:
-        return f"Nenhum órgão encontrado para '{desc}'."
+        return f"Nenhum órgão encontrado com CNPJ {cnpj}."
 
-    lines = [f"**Total:** {resultado.total} órgãos\n"]
-    for i, o in enumerate(resultado.orgaos, 1):
-        lines.extend(
-            [
-                f"### {i}. {o.razao_social or 'N/A'}",
-                f"**CNPJ:** {o.cnpj or 'N/A'}",
-                f"**Esfera:** {o.esfera or 'N/A'} | **Poder:** {o.poder or 'N/A'}",
-                f"**Local:** {o.municipio or 'N/A'}/{o.uf or 'N/A'}",
-                "",
-            ]
-        )
-
-    if resultado.total > len(resultado.orgaos):
-        lines.append(f"*Use pagina={pagina + 1} para mais resultados.*")
+    o = resultado.orgaos[0]
+    lines = [
+        f"## {o.razao_social or 'N/A'}",
+        f"**CNPJ:** {o.cnpj or 'N/A'}",
+        f"**Esfera:** {o.esfera or 'N/A'} | **Poder:** {o.poder or 'N/A'}",
+        f"**Local:** {o.municipio or 'N/A'}/{o.uf or 'N/A'}",
+    ]
     return "\n".join(lines)
 
 

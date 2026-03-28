@@ -33,15 +33,21 @@ from .schemas import (
 
 
 def _ensure_list(data: Any, url: str) -> list[dict[str, Any]]:
-    """Validate that API response is a list of dicts.
+    """Extract a list of dicts from the API response.
 
-    The DataSUS API sometimes returns a JSON string or dict on errors
-    instead of the expected list, causing 'str' has no attribute 'get'.
+    The DataSUS API returns either a list or a dict with a single key
+    containing the list (e.g. {"estabelecimentos": [...]}).
     """
     if isinstance(data, list):
         return data
+    if isinstance(data, dict):
+        # Try to extract the first list-valued key (e.g. "estabelecimentos")
+        for v in data.values():
+            if isinstance(v, list):
+                return v
+        return []
     raise HttpClientError(
-        f"Unexpected response from {url}: expected list, got {type(data).__name__}"
+        f"Unexpected response from {url}: expected list/dict, got {type(data).__name__}"
     )
 
 

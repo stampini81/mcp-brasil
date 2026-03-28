@@ -487,30 +487,26 @@ class TestConsultarFornecedor:
 class TestConsultarOrgao:
     @pytest.mark.asyncio
     @respx.mock
-    async def test_returns_parsed_orgaos(self) -> None:
-        respx.get(ORGAOS_URL).mock(
+    async def test_returns_parsed_orgao_by_cnpj(self) -> None:
+        cnpj = "00394460000141"
+        respx.get(f"{ORGAOS_URL}/{cnpj}").mock(
             return_value=httpx.Response(
                 200,
                 json={
-                    "totalRegistros": 1,
-                    "data": [
-                        {
-                            "cnpj": "00394460000141",
-                            "razaoSocial": "Ministério da Educação",
-                            "esferaNome": "Federal",
-                            "poderNome": "Executivo",
-                            "ufSigla": "DF",
-                            "municipioNome": "Brasília",
-                        }
-                    ],
+                    "cnpj": cnpj,
+                    "razaoSocial": "Ministério da Educação",
+                    "esferaNome": "Federal",
+                    "poderNome": "Executivo",
+                    "ufSigla": "DF",
+                    "municipioNome": "Brasília",
                 },
             )
         )
-        result = await client.consultar_orgao(query="educação")
+        result = await client.consultar_orgao(cnpj=cnpj)
         assert result.total == 1
         assert len(result.orgaos) == 1
         o = result.orgaos[0]
-        assert o.cnpj == "00394460000141"
+        assert o.cnpj == cnpj
         assert o.razao_social == "Ministério da Educação"
         assert o.esfera == "Federal"
         assert o.poder == "Executivo"
@@ -520,40 +516,34 @@ class TestConsultarOrgao:
     @pytest.mark.asyncio
     @respx.mock
     async def test_empty_response(self) -> None:
-        respx.get(ORGAOS_URL).mock(
-            return_value=httpx.Response(
-                200,
-                json={"totalRegistros": 0, "data": []},
-            )
+        cnpj = "99999999999999"
+        respx.get(f"{ORGAOS_URL}/{cnpj}").mock(
+            return_value=httpx.Response(200, json={}),
         )
-        result = await client.consultar_orgao(query="inexistente")
+        result = await client.consultar_orgao(cnpj=cnpj)
         assert result.total == 0
         assert result.orgaos == []
 
     @pytest.mark.asyncio
     @respx.mock
     async def test_orgao_fields_fallback(self) -> None:
-        respx.get(ORGAOS_URL).mock(
+        cnpj = "11111111000100"
+        respx.get(f"{ORGAOS_URL}/{cnpj}").mock(
             return_value=httpx.Response(
                 200,
                 json={
-                    "count": 1,
-                    "resultado": [
-                        {
-                            "cnpj": "11111111000100",
-                            "razaoSocial": "Prefeitura Municipal",
-                            "esferaId": "Municipal",
-                            "poderId": "Executivo",
-                            "ufNome": "São Paulo",
-                            "municipioNome": "Campinas",
-                        }
-                    ],
+                    "cnpj": cnpj,
+                    "razaoSocial": "Prefeitura Municipal",
+                    "esferaId": "Municipal",
+                    "poderId": "Executivo",
+                    "ufNome": "São Paulo",
+                    "municipioNome": "Campinas",
                 },
             )
         )
-        result = await client.consultar_orgao(query="prefeitura")
+        result = await client.consultar_orgao(cnpj=cnpj)
         o = result.orgaos[0]
-        assert o.cnpj == "11111111000100"
+        assert o.cnpj == cnpj
         assert o.razao_social == "Prefeitura Municipal"
         assert o.esfera == "Municipal"
         assert o.poder == "Executivo"

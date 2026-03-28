@@ -35,7 +35,10 @@ async def buscar_datasets(
     """
     await ctx.info(f"Buscando datasets no OpenDataSUS: '{query}'...")
 
-    datasets, total = await client.buscar_datasets(query, limite=limite)
+    try:
+        datasets, total = await client.buscar_datasets(query, limite=limite)
+    except RuntimeError as exc:
+        return str(exc)
 
     if not datasets:
         return (

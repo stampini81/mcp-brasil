@@ -103,10 +103,10 @@ class TestToolExecution:
                 assert "Ministério da Educação" in result.data
 
     @pytest.mark.asyncio
-    async def test_consultar_orgao_no_filter(self) -> None:
+    async def test_consultar_orgao_invalid_cnpj(self) -> None:
         async with Client(mcp) as c:
-            result = await c.call_tool("consultar_orgao", {})
-            assert "Informe pelo menos um filtro" in result.data
+            result = await c.call_tool("consultar_orgao", {"cnpj": "123"})
+            assert "CNPJ inválido" in result.data
 
     @pytest.mark.asyncio
     async def test_buscar_pca_e2e(self) -> None:

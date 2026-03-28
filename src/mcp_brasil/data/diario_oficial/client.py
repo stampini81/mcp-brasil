@@ -81,27 +81,35 @@ async def buscar_diarios(
     )
 
 
+def _extract_cities(data: Any) -> list[dict[str, Any]]:
+    """Extract city list from API response (handles both dict and list formats)."""
+    if isinstance(data, dict):
+        cities = data.get("cities", [])
+        return cities if isinstance(cities, list) else []
+    if isinstance(data, list):
+        return data
+    return []
+
+
 async def buscar_cidades(nome_cidade: str) -> list[CidadeQueridoDiario]:
     """Search cities available in Querido Diário by name."""
     try:
-        data: list[dict[str, Any]] = await http_get(CITIES_URL, params={"city_name": nome_cidade})
+        data = await http_get(CITIES_URL, params={"city_name": nome_cidade})
     except (HttpClientError, Exception) as exc:
         logger.warning("Querido Diário API error searching cities '%s': %s", nome_cidade, exc)
         return []
 
-    if not data or not isinstance(data, list):
-        return []
-    return [CidadeQueridoDiario(**c) for c in data]
+    items = _extract_cities(data)
+    return [CidadeQueridoDiario(**c) for c in items]
 
 
 async def listar_cidades() -> list[CidadeQueridoDiario]:
     """List all cities available in Querido Diário."""
     try:
-        data: list[dict[str, Any]] = await http_get(CITIES_URL)
+        data = await http_get(CITIES_URL)
     except (HttpClientError, Exception) as exc:
         logger.warning("Querido Diário API error listing cities: %s", exc)
         return []
 
-    if not data or not isinstance(data, list):
-        return []
-    return [CidadeQueridoDiario(**c) for c in data]
+    items = _extract_cities(data)
+    return [CidadeQueridoDiario(**c) for c in items]

@@ -76,11 +76,31 @@ async def buscar_datasets(
 
     Returns:
         Tuple of (datasets, total_count).
+
+    Raises:
+        RuntimeError: If the CKAN API is unavailable (e.g. redirects to HTML).
     """
+    from mcp_brasil.exceptions import HttpClientError
+
     rows = min(limite, MAX_LIMIT)
     params: dict[str, str] = {"q": query, "rows": str(rows)}
-    data = await http_get(PACKAGE_SEARCH_URL, params=params)
+    try:
+        data = await http_get(PACKAGE_SEARCH_URL, params=params)
+    except (HttpClientError, Exception) as exc:
+        msg = (
+            "A API CKAN do OpenDataSUS (opendatasus.saude.gov.br) está indisponível. "
+            "O portal migrou para dadosabertos.saude.gov.br sem API pública. "
+            "Use 'listar_datasets_conhecidos' para ver datasets pré-catalogados."
+        )
+        raise RuntimeError(msg) from exc
     result = _extract_result(data)
+    if not isinstance(data, dict) or "result" not in data:
+        msg = (
+            "A API CKAN do OpenDataSUS retornou resposta inválida (não-JSON). "
+            "O portal pode ter migrado. "
+            "Use 'listar_datasets_conhecidos' para ver datasets pré-catalogados."
+        )
+        raise RuntimeError(msg)
     datasets = [_parse_dataset(d) for d in result.get("results", [])]
     total = result.get("count", len(datasets))
     return datasets, total

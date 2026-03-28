@@ -399,12 +399,13 @@ class TestMalformedResponses:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_estabelecimentos_dict_response(self) -> None:
+    async def test_estabelecimentos_dict_without_list_returns_empty(self) -> None:
+        """Dict response without list-valued keys returns empty list (API wraps in dict)."""
         respx.get(ESTABELECIMENTOS_URL).mock(
             return_value=httpx.Response(200, json={"error": "not found"})
         )
-        with pytest.raises(HttpClientError, match="expected list"):
-            await client.buscar_estabelecimentos()
+        result = await client.buscar_estabelecimentos()
+        assert result == []
 
     @pytest.mark.asyncio
     @respx.mock

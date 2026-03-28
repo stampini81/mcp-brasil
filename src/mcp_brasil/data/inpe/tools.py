@@ -7,12 +7,23 @@ Rules (ADR-001):
 
 from __future__ import annotations
 
+import logging
+
 from fastmcp import Context
 
 from mcp_brasil._shared.formatting import format_number_br, markdown_table
+from mcp_brasil.exceptions import HttpClientError
 
 from . import client
 from .constants import BIOMAS, DEFAULT_LIMIT
+
+logger = logging.getLogger(__name__)
+
+_API_INDISPONIVEL = (
+    "A API do INPE (TerraBrasilis/BD Queimadas) está indisponível. "
+    "Os endpoints foram descontinuados. Dados de queimadas podem ser obtidos em: "
+    "https://data.inpe.br/queimadas/pages/secao_downloads/dados-abertos/"
+)
 
 
 async def buscar_focos_queimadas(
@@ -51,13 +62,17 @@ async def buscar_focos_queimadas(
     filtro_str = f" ({', '.join(filtros)})" if filtros else ""
     await ctx.info(f"Buscando focos de queimadas{filtro_str}...")
 
-    focos = await client.buscar_focos(
-        estado=estado,
-        data_inicio=data_inicio,
-        data_fim=data_fim,
-        satelite=satelite,
-        limite=limite,
-    )
+    try:
+        focos = await client.buscar_focos(
+            estado=estado,
+            data_inicio=data_inicio,
+            data_fim=data_fim,
+            satelite=satelite,
+            limite=limite,
+        )
+    except HttpClientError as exc:
+        logger.warning("buscar_focos_queimadas failed: %s", exc)
+        return _API_INDISPONIVEL
 
     if not focos:
         return "Nenhum foco de queimada encontrado para os filtros informados."
@@ -120,11 +135,15 @@ async def consultar_desmatamento(
     filtro_str = f" ({', '.join(filtros)})" if filtros else ""
     await ctx.info(f"Consultando desmatamento PRODES{filtro_str}...")
 
-    dados = await client.buscar_dados_prodes(
-        bioma=bioma_nome,
-        estado=estado,
-        ano=ano,
-    )
+    try:
+        dados = await client.buscar_dados_prodes(
+            bioma=bioma_nome,
+            estado=estado,
+            ano=ano,
+        )
+    except HttpClientError as exc:
+        logger.warning("consultar_desmatamento failed: %s", exc)
+        return _API_INDISPONIVEL
 
     if not dados:
         return "Nenhum dado de desmatamento encontrado para os filtros informados."
@@ -185,12 +204,16 @@ async def alertas_deter(
     filtro_str = f" ({', '.join(filtros)})" if filtros else ""
     await ctx.info(f"Consultando alertas DETER{filtro_str}...")
 
-    alertas = await client.buscar_alertas_deter(
-        bioma=bioma_nome,
-        estado=estado,
-        data_inicio=data_inicio,
-        data_fim=data_fim,
-    )
+    try:
+        alertas = await client.buscar_alertas_deter(
+            bioma=bioma_nome,
+            estado=estado,
+            data_inicio=data_inicio,
+            data_fim=data_fim,
+        )
+    except HttpClientError as exc:
+        logger.warning("alertas_deter failed: %s", exc)
+        return _API_INDISPONIVEL
 
     if not alertas:
         return "Nenhum alerta DETER encontrado para os filtros informados."
@@ -228,7 +251,12 @@ async def dados_satelite(ctx: Context) -> str:
         Tabela com os satélites disponíveis.
     """
     await ctx.info("Listando satélites disponíveis...")
-    satelites = await client.listar_satelites()
+
+    try:
+        satelites = await client.listar_satelites()
+    except HttpClientError as exc:
+        logger.warning("dados_satelite failed: %s", exc)
+        return _API_INDISPONIVEL
 
     if not satelites:
         return "Nenhum satélite disponível no momento."
