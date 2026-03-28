@@ -1,10 +1,10 @@
 """HTTP client for the Querido Diário API.
 
 Endpoints:
-    - /gazettes?querystring=...        → buscar_diarios
-    - /gazettes/{territory_id}?...     → buscar_diarios (por município)
-    - /cities?city_name=...            → buscar_cidades
-    - /cities                          → listar_cidades
+    - /gazettes?querystring=...          → buscar_diarios (multi-território)
+    - /gazettes/{territory_id}?...       → buscar_diarios (município único)
+    - /cities?city_name=...              → buscar_cidades
+    - /cities                            → listar_cidades
 """
 
 from __future__ import annotations
@@ -15,13 +15,11 @@ from typing import Any
 from mcp_brasil._shared.http_client import http_get
 from mcp_brasil.exceptions import HttpClientError
 
-from .constants import CITIES_URL, DEFAULT_PAGE_SIZE, EXCERPTS_URL, GAZETTES_URL
+from .constants import CITIES_URL, DEFAULT_PAGE_SIZE, GAZETTES_URL
 from .schemas import (
     CidadeQueridoDiario,
     DiarioOficial,
     DiarioResultado,
-    Excerto,
-    ExcertoResultado,
 )
 
 logger = logging.getLogger(__name__)
@@ -29,27 +27,46 @@ logger = logging.getLogger(__name__)
 
 async def buscar_diarios(
     querystring: str,
-    territory_id: str | None = None,
+    territory_ids: list[str] | None = None,
     since: str | None = None,
     until: str | None = None,
     offset: int = 0,
     size: int = DEFAULT_PAGE_SIZE,
+    excerpt_size: int = 500,
+    number_of_excerpts: int = 3,
+    is_exact_search: bool = True,
+    sort_by: str = "relevance",
 ) -> DiarioResultado:
-    """Search gazettes by keyword, optionally filtered by territory and date range."""
-    url = f"{GAZETTES_URL}/{territory_id}" if territory_id else GAZETTES_URL
+    """Search gazettes by keyword with advanced filtering.
 
+    Supports multi-territory search via territory_ids list,
+    configurable excerpt size, exact/fuzzy search, and sorting.
+    """
     params: dict[str, str] = {
         "querystring": querystring,
         "offset": str(offset),
         "size": str(size),
+        "excerpt_size": str(excerpt_size),
+        "number_of_excerpts": str(number_of_excerpts),
     }
+
+    if not is_exact_search:
+        params["pre_tags"] = ""
+        params["post_tags"] = ""
+
+    if territory_ids:
+        params["territory_ids"] = ",".join(territory_ids)
+
     if since:
         params["since"] = since
     if until:
         params["until"] = until
 
+    if sort_by != "relevance":
+        params["sort_by"] = sort_by
+
     try:
-        data: dict[str, Any] = await http_get(url, params=params)
+        data: dict[str, Any] = await http_get(GAZETTES_URL, params=params)
     except HttpClientError as exc:
         logger.warning("Querido Diário API error for '%s': %s", querystring, exc)
         return DiarioResultado(total_gazettes=0, gazettes=[])
@@ -61,43 +78,6 @@ async def buscar_diarios(
     return DiarioResultado(
         total_gazettes=data.get("total_gazettes", len(gazettes)),
         gazettes=gazettes,
-    )
-
-
-async def buscar_trechos(
-    territory_id: str,
-    querystring: str,
-    since: str | None = None,
-    until: str | None = None,
-    offset: int = 0,
-    size: int = DEFAULT_PAGE_SIZE,
-) -> ExcertoResultado:
-    """Search excerpts within a specific territory's gazettes."""
-    url = EXCERPTS_URL.format(territory_id=territory_id)
-
-    params: dict[str, str] = {
-        "querystring": querystring,
-        "offset": str(offset),
-        "size": str(size),
-    }
-    if since:
-        params["since"] = since
-    if until:
-        params["until"] = until
-
-    try:
-        data: dict[str, Any] = await http_get(url, params=params)
-    except HttpClientError as exc:
-        logger.warning("Querido Diário API error for '%s': %s", querystring, exc)
-        return ExcertoResultado(total_excerpts=0, excerpts=[])
-
-    if not data or not isinstance(data, dict):
-        return ExcertoResultado(total_excerpts=0, excerpts=[])
-
-    excerpts = [Excerto(**e) for e in data.get("excerpts", [])]
-    return ExcertoResultado(
-        total_excerpts=data.get("total_excerpts", len(excerpts)),
-        excerpts=excerpts,
     )
 
 

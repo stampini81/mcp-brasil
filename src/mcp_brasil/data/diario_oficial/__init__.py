@@ -1,15 +1,24 @@
-"""Feature Diário Oficial — busca em diários oficiais municipais via Querido Diário."""
+"""Feature Diário Oficial — busca em diários oficiais municipais e federais."""
 
 from mcp_brasil._shared.feature import FeatureMeta
 
 FEATURE_META = FeatureMeta(
     name="diario_oficial",
     description=(
-        "Querido Diário: busca textual em diários oficiais municipais de 5.000+ cidades. "
-        "Contratos, nomeações, sanções, licitações e atos administrativos."
+        "Diários oficiais: busca em diários municipais (Querido Diário, 5.000+ cidades) "
+        "e no Diário Oficial da União (DOU federal). Contratos, nomeações, licitações, "
+        "decretos, portarias e atos administrativos."
     ),
-    version="0.1.0",
-    api_base="https://queridodiario.ok.org.br",
+    version="0.2.0",
+    api_base="https://api.queridodiario.ok.org.br",
     requires_auth=False,
-    tags=["diario-oficial", "transparencia", "municipios", "licitacoes", "contratos"],
+    tags=[
+        "diario-oficial",
+        "transparencia",
+        "municipios",
+        "federal",
+        "dou",
+        "licitacoes",
+        "contratos",
+    ],
 )

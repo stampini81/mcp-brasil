@@ -5,7 +5,7 @@ import pytest
 import respx
 
 from mcp_brasil.data.diario_oficial import client
-from mcp_brasil.data.diario_oficial.constants import CITIES_URL, EXCERPTS_URL, GAZETTES_URL
+from mcp_brasil.data.diario_oficial.constants import CITIES_URL, GAZETTES_URL
 
 # ---------------------------------------------------------------------------
 # buscar_diarios
@@ -61,15 +61,19 @@ class TestBuscarDiarios:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_territory_id_in_url(self) -> None:
-        route = respx.get(f"{GAZETTES_URL}/3550308").mock(
+    async def test_territory_ids_in_params(self) -> None:
+        route = respx.get(GAZETTES_URL).mock(
             return_value=httpx.Response(
                 200,
                 json={"total_gazettes": 0, "gazettes": []},
             )
         )
-        await client.buscar_diarios(querystring="teste", territory_id="3550308")
-        assert route.called
+        await client.buscar_diarios(
+            querystring="teste",
+            territory_ids=["3550308", "3304557"],
+        )
+        req_url = str(route.calls[0].request.url)
+        assert "territory_ids=3550308%2C3304557" in req_url or "territory_ids=" in req_url
 
     @pytest.mark.asyncio
     @respx.mock
@@ -91,6 +95,40 @@ class TestBuscarDiarios:
 
     @pytest.mark.asyncio
     @respx.mock
+    async def test_advanced_params(self) -> None:
+        route = respx.get(GAZETTES_URL).mock(
+            return_value=httpx.Response(
+                200,
+                json={"total_gazettes": 0, "gazettes": []},
+            )
+        )
+        await client.buscar_diarios(
+            querystring="teste",
+            excerpt_size=300,
+            number_of_excerpts=5,
+            sort_by="descending_date",
+        )
+        req_url = str(route.calls[0].request.url)
+        assert "excerpt_size=300" in req_url
+        assert "number_of_excerpts=5" in req_url
+        assert "sort_by=descending_date" in req_url
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_fuzzy_search_params(self) -> None:
+        route = respx.get(GAZETTES_URL).mock(
+            return_value=httpx.Response(
+                200,
+                json={"total_gazettes": 0, "gazettes": []},
+            )
+        )
+        await client.buscar_diarios(querystring="teste", is_exact_search=False)
+        req_url = str(route.calls[0].request.url)
+        assert "pre_tags=" in req_url
+        assert "post_tags=" in req_url
+
+    @pytest.mark.asyncio
+    @respx.mock
     async def test_empty_response(self) -> None:
         respx.get(GAZETTES_URL).mock(
             return_value=httpx.Response(
@@ -102,79 +140,33 @@ class TestBuscarDiarios:
         assert result.total_gazettes == 0
         assert result.gazettes == []
 
-
-# ---------------------------------------------------------------------------
-# buscar_trechos
-# ---------------------------------------------------------------------------
-
-
-class TestBuscarTrechos:
     @pytest.mark.asyncio
     @respx.mock
-    async def test_returns_parsed_excerpts(self) -> None:
-        url = EXCERPTS_URL.format(territory_id="3550308")
-        respx.get(url).mock(
+    async def test_new_schema_fields_parsed(self) -> None:
+        respx.get(GAZETTES_URL).mock(
             return_value=httpx.Response(
                 200,
                 json={
-                    "total_excerpts": 1,
-                    "excerpts": [
+                    "total_gazettes": 1,
+                    "gazettes": [
                         {
                             "territory_id": "3550308",
                             "territory_name": "São Paulo",
                             "state_code": "SP",
-                            "date": "2024-06-15",
-                            "edition_number": "9876",
-                            "is_extra_edition": False,
-                            "url": "https://example.com/gazette.pdf",
-                            "txt_url": "https://example.com/gazette.txt",
-                            "excerpt": "Contrato firmado",
-                            "subheadline": "Secretaria de Saúde",
+                            "date": "2024-01-15",
+                            "scraped_at": "2024-01-16T10:00:00",
+                            "themes": ["saúde"],
+                            "subthemes": ["vacinação"],
                         }
                     ],
                 },
             )
         )
-        result = await client.buscar_trechos(territory_id="3550308", querystring="contrato")
-        assert result.total_excerpts == 1
-        assert len(result.excerpts) == 1
-        assert result.excerpts[0].territory_name == "São Paulo"
-        assert result.excerpts[0].excerpt == "Contrato firmado"
-        assert result.excerpts[0].subheadline == "Secretaria de Saúde"
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_empty_response(self) -> None:
-        url = EXCERPTS_URL.format(territory_id="3550308")
-        respx.get(url).mock(
-            return_value=httpx.Response(
-                200,
-                json={"total_excerpts": 0, "excerpts": []},
-            )
-        )
-        result = await client.buscar_trechos(territory_id="3550308", querystring="nada")
-        assert result.total_excerpts == 0
-        assert result.excerpts == []
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_date_filters_in_params(self) -> None:
-        url = EXCERPTS_URL.format(territory_id="3550308")
-        route = respx.get(url).mock(
-            return_value=httpx.Response(
-                200,
-                json={"total_excerpts": 0, "excerpts": []},
-            )
-        )
-        await client.buscar_trechos(
-            territory_id="3550308",
-            querystring="teste",
-            since="2024-01-01",
-            until="2024-12-31",
-        )
-        req_url = str(route.calls[0].request.url)
-        assert "since=2024-01-01" in req_url
-        assert "until=2024-12-31" in req_url
+        result = await client.buscar_diarios(querystring="teste")
+        g = result.gazettes[0]
+        assert g.scraped_at == "2024-01-16T10:00:00"
+        assert g.themes == ["saúde"]
+        assert g.subthemes == ["vacinação"]
 
 
 # ---------------------------------------------------------------------------

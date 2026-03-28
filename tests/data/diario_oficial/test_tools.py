@@ -13,11 +13,12 @@ from mcp_brasil.data.diario_oficial.schemas import (
     CidadeQueridoDiario,
     DiarioOficial,
     DiarioResultado,
-    Excerto,
-    ExcertoResultado,
+    PublicacaoDOU,
+    ResultadoDOU,
 )
 
 CLIENT_MODULE = "mcp_brasil.data.diario_oficial.client"
+CLIENT_DOU_MODULE = "mcp_brasil.data.diario_oficial.client_dou"
 
 
 def _mock_ctx() -> MagicMock:
@@ -120,108 +121,98 @@ class TestBuscarDiarios:
         assert "Nenhum diário oficial encontrado" in result
         assert "inexistente" in result
 
-
-# ---------------------------------------------------------------------------
-# buscar_trechos
-# ---------------------------------------------------------------------------
-
-
-class TestBuscarTrechos:
     @pytest.mark.asyncio
-    async def test_formats_results(self) -> None:
-        mock_data = ExcertoResultado(
-            total_excerpts=1,
-            excerpts=[
-                Excerto(
+    async def test_passes_territory_id_as_list(self) -> None:
+        mock_data = DiarioResultado(total_gazettes=0, gazettes=[])
+        ctx = _mock_ctx()
+        with patch(
+            f"{CLIENT_MODULE}.buscar_diarios",
+            new_callable=AsyncMock,
+            return_value=mock_data,
+        ) as mock_client:
+            await tools.buscar_diarios("teste", ctx, territorio_id="3550308")
+        mock_client.assert_called_once()
+        call_kwargs = mock_client.call_args.kwargs
+        assert call_kwargs["territory_ids"] == ["3550308"]
+
+    @pytest.mark.asyncio
+    async def test_passes_sort_and_exact_params(self) -> None:
+        mock_data = DiarioResultado(total_gazettes=0, gazettes=[])
+        ctx = _mock_ctx()
+        with patch(
+            f"{CLIENT_MODULE}.buscar_diarios",
+            new_callable=AsyncMock,
+            return_value=mock_data,
+        ) as mock_client:
+            await tools.buscar_diarios(
+                "teste", ctx, busca_exata=False, ordenar_por="descending_date"
+            )
+        call_kwargs = mock_client.call_args.kwargs
+        assert call_kwargs["is_exact_search"] is False
+        assert call_kwargs["sort_by"] == "descending_date"
+
+
+# ---------------------------------------------------------------------------
+# buscar_diarios_regiao
+# ---------------------------------------------------------------------------
+
+
+class TestBuscarDiariosRegiao:
+    @pytest.mark.asyncio
+    async def test_filters_by_uf(self) -> None:
+        mock_data = DiarioResultado(
+            total_gazettes=1,
+            gazettes=[
+                DiarioOficial(
                     territory_id="3550308",
                     territory_name="São Paulo",
                     state_code="SP",
-                    date="2024-06-15",
-                    edition_number="9876",
-                    is_extra_edition=False,
-                    txt_url="https://example.com/excerpt.txt",
-                    excerpt="Contrato de prestação de serviços firmado",
-                    subheadline="Secretaria de Saúde",
+                    date="2024-01-15",
+                    excerpts=["Resultado SP"],
                 ),
             ],
         )
         ctx = _mock_ctx()
         with patch(
-            f"{CLIENT_MODULE}.buscar_trechos",
+            f"{CLIENT_MODULE}.buscar_diarios",
             new_callable=AsyncMock,
             return_value=mock_data,
-        ):
-            result = await tools.buscar_trechos("3550308", "contrato", ctx)
+        ) as mock_client:
+            result = await tools.buscar_diarios_regiao("teste", ctx, uf="SP")
         assert "São Paulo" in result
-        assert "SP" in result
-        assert "2024-06-15" in result
-        assert "9876" in result
-        assert "Secretaria de Saúde" in result
-        assert "prestação de serviços" in result
-        assert "Texto completo" in result
-        assert "1 trechos encontrados" in result
+        call_kwargs = mock_client.call_args.kwargs
+        assert "3550308" in call_kwargs["territory_ids"]
 
     @pytest.mark.asyncio
-    async def test_strips_html_tags(self) -> None:
-        mock_data = ExcertoResultado(
-            total_excerpts=1,
-            excerpts=[
-                Excerto(
-                    territory_id="3550308",
-                    territory_name="São Paulo",
-                    state_code="SP",
-                    excerpt="Trecho com <em>destaque</em> e <b>negrito</b>",
-                ),
-            ],
-        )
+    async def test_capitais_apenas(self) -> None:
+        mock_data = DiarioResultado(total_gazettes=0, gazettes=[])
         ctx = _mock_ctx()
         with patch(
-            f"{CLIENT_MODULE}.buscar_trechos",
+            f"{CLIENT_MODULE}.buscar_diarios",
             new_callable=AsyncMock,
             return_value=mock_data,
-        ):
-            result = await tools.buscar_trechos("3550308", "destaque", ctx)
-        assert "<em>" not in result
-        assert "<b>" not in result
-        assert "destaque" in result
-        assert "negrito" in result
+        ) as mock_client:
+            await tools.buscar_diarios_regiao("teste", ctx, capitais_apenas=True)
+        call_kwargs = mock_client.call_args.kwargs
+        assert len(call_kwargs["territory_ids"]) == 20  # 20 capitais cobertas
+
+    @pytest.mark.asyncio
+    async def test_uf_not_found(self) -> None:
+        ctx = _mock_ctx()
+        result = await tools.buscar_diarios_regiao("teste", ctx, uf="XX")
+        assert "Nenhuma capital coberta" in result
 
     @pytest.mark.asyncio
     async def test_empty_results(self) -> None:
-        mock_data = ExcertoResultado(total_excerpts=0, excerpts=[])
+        mock_data = DiarioResultado(total_gazettes=0, gazettes=[])
         ctx = _mock_ctx()
         with patch(
-            f"{CLIENT_MODULE}.buscar_trechos",
+            f"{CLIENT_MODULE}.buscar_diarios",
             new_callable=AsyncMock,
             return_value=mock_data,
         ):
-            result = await tools.buscar_trechos("3550308", "inexistente", ctx)
-        assert "Nenhum trecho encontrado" in result
-        assert "3550308" in result
-
-    @pytest.mark.asyncio
-    async def test_pagination_hint(self) -> None:
-        mock_data = ExcertoResultado(
-            total_excerpts=25,
-            excerpts=[
-                Excerto(
-                    territory_id="3550308",
-                    territory_name="São Paulo",
-                    state_code="SP",
-                    excerpt=f"Trecho {i}",
-                )
-                for i in range(10)
-            ],
-        )
-        ctx = _mock_ctx()
-        with patch(
-            f"{CLIENT_MODULE}.buscar_trechos",
-            new_callable=AsyncMock,
-            return_value=mock_data,
-        ):
-            result = await tools.buscar_trechos("3550308", "teste", ctx)
-        assert "pagina=1" in result
-        assert "25" in result
+            result = await tools.buscar_diarios_regiao("inexistente", ctx, capitais_apenas=True)
+        assert "Nenhum diário encontrado" in result
 
 
 # ---------------------------------------------------------------------------
@@ -323,5 +314,108 @@ class TestListarTerritorios:
         ):
             result = await tools.listar_territorios(ctx)
         assert "150 municípios" in result
-        # The table is truncated to 100 rows, so Cidade 149 should not appear
         assert "Cidade 0" in result
+
+
+# ---------------------------------------------------------------------------
+# buscar_diario_unificado
+# ---------------------------------------------------------------------------
+
+
+class TestBuscarDiarioUnificado:
+    @pytest.mark.asyncio
+    async def test_both_sources(self) -> None:
+        mock_qd = DiarioResultado(
+            total_gazettes=1,
+            gazettes=[
+                DiarioOficial(
+                    territory_name="São Paulo",
+                    state_code="SP",
+                    date="2024-01-15",
+                    excerpts=["Resultado municipal"],
+                ),
+            ],
+        )
+        mock_dou = ResultadoDOU(
+            total=1,
+            publicacoes=[
+                PublicacaoDOU(
+                    titulo="Portaria Federal",
+                    orgao="Ministério X",
+                    data_publicacao="2024-01-15",
+                ),
+            ],
+        )
+        ctx = _mock_ctx()
+        with (
+            patch(
+                f"{CLIENT_MODULE}.buscar_diarios",
+                new_callable=AsyncMock,
+                return_value=mock_qd,
+            ),
+            patch(
+                f"{CLIENT_DOU_MODULE}.buscar_dou",
+                new_callable=AsyncMock,
+                return_value=mock_dou,
+            ),
+        ):
+            result = await tools.buscar_diario_unificado("teste", ctx)
+        assert "DOU Federal" in result
+        assert "Diários Municipais" in result
+        assert "Portaria Federal" in result
+        assert "São Paulo" in result
+
+    @pytest.mark.asyncio
+    async def test_federal_only(self) -> None:
+        mock_dou = ResultadoDOU(
+            total=1,
+            publicacoes=[
+                PublicacaoDOU(titulo="Decreto 123", orgao="Gov Federal"),
+            ],
+        )
+        ctx = _mock_ctx()
+        with patch(
+            f"{CLIENT_DOU_MODULE}.buscar_dou",
+            new_callable=AsyncMock,
+            return_value=mock_dou,
+        ):
+            result = await tools.buscar_diario_unificado("teste", ctx, escopo="federal")
+        assert "DOU Federal" in result
+        assert "Diários Municipais" not in result
+
+    @pytest.mark.asyncio
+    async def test_municipal_only(self) -> None:
+        mock_qd = DiarioResultado(
+            total_gazettes=1,
+            gazettes=[DiarioOficial(territory_name="Natal", state_code="RN")],
+        )
+        ctx = _mock_ctx()
+        with patch(
+            f"{CLIENT_MODULE}.buscar_diarios",
+            new_callable=AsyncMock,
+            return_value=mock_qd,
+        ):
+            result = await tools.buscar_diario_unificado("teste", ctx, escopo="municipal")
+        assert "Diários Municipais" in result
+        assert "DOU Federal" not in result
+
+    @pytest.mark.asyncio
+    async def test_empty_both(self) -> None:
+        mock_qd = DiarioResultado(total_gazettes=0, gazettes=[])
+        mock_dou = ResultadoDOU(total=0, publicacoes=[])
+        ctx = _mock_ctx()
+        with (
+            patch(
+                f"{CLIENT_MODULE}.buscar_diarios",
+                new_callable=AsyncMock,
+                return_value=mock_qd,
+            ),
+            patch(
+                f"{CLIENT_DOU_MODULE}.buscar_dou",
+                new_callable=AsyncMock,
+                return_value=mock_dou,
+            ),
+        ):
+            result = await tools.buscar_diario_unificado("inexistente", ctx)
+        assert "Nenhum resultado no DOU" in result
+        assert "Nenhum resultado nos diários municipais" in result
