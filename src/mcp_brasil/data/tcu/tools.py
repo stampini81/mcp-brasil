@@ -10,9 +10,10 @@ from __future__ import annotations
 
 from fastmcp import Context
 
-from mcp_brasil._shared.formatting import markdown_table
+from mcp_brasil._shared.formatting import format_brl, markdown_table, truncate_list
 
 from . import client
+from .schemas import ParcelaDebito
 
 
 async def consultar_acordaos(
@@ -244,5 +245,152 @@ async def consultar_pedidos_congresso(
     ]
     return markdown_table(
         ["Tipo", "Número", "Data Aprovação", "Autor", "Processo", "Assunto"],
+        rows,
+    )
+
+
+async def calcular_debito(
+    ctx: Context,
+    data_atualizacao: str,
+    data_fato: str,
+    valor_original: float,
+    aplica_juros: bool = True,
+) -> str:
+    """Calcula débito atualizado com correção monetária pela variação SELIC.
+
+    Usa a calculadora pública do TCU para atualizar valores de débitos
+    com correção monetária e juros de mora.
+
+    Args:
+        data_atualizacao: Data para atualização do valor (DD/MM/AAAA).
+        data_fato: Data do fato gerador do débito (DD/MM/AAAA).
+        valor_original: Valor original do débito em reais.
+        aplica_juros: Se deve aplicar juros de mora (padrão: True).
+
+    Returns:
+        Resultado do cálculo com valor original, correção e total.
+    """
+    await ctx.info(
+        f"Calculando débito: {format_brl(valor_original)} de {data_fato} "
+        f"atualizado para {data_atualizacao}..."
+    )
+
+    parcela = ParcelaDebito(
+        data_fato=data_fato, indicativo="D", valor_original=valor_original
+    )
+    resultado = await client.calcular_debito(
+        data_atualizacao=data_atualizacao,
+        parcelas=[parcela],
+        aplica_juros=aplica_juros,
+    )
+
+    return (
+        f"**Cálculo de Débito — TCU**\n\n"
+        f"Data do fato: {data_fato}\n"
+        f"Data de atualização: {data_atualizacao}\n"
+        f"Juros de mora: {'Sim' if aplica_juros else 'Não'}\n\n"
+        + markdown_table(
+            ["Item", "Valor"],
+            [
+                ("Valor original", format_brl(resultado.saldo_debito)),
+                ("Correção SELIC", format_brl(resultado.saldo_variacao_selic)),
+                ("Juros de mora", format_brl(resultado.saldo_juros)),
+                ("**Total atualizado**", f"**{format_brl(resultado.saldo_total)}**"),
+            ],
+        )
+    )
+
+
+async def consultar_termos_contratuais(
+    ctx: Context,
+    ano: int | None = None,
+    fornecedor: str | None = None,
+    limite: int = 20,
+) -> str:
+    """Consulta termos contratuais (contratos) firmados pelo próprio TCU.
+
+    Retorna contratos, aditamentos e termos contratuais do tribunal.
+    A API retorna todos os registros (~3800+), por isso é possível filtrar
+    por ano e/ou nome do fornecedor.
+
+    Args:
+        ano: Ano do contrato para filtrar (ex: 2025).
+        fornecedor: Parte do nome do fornecedor para filtrar (case-insensitive).
+        limite: Quantidade máxima de registros a exibir (padrão: 20).
+
+    Returns:
+        Tabela com os termos contratuais encontrados.
+    """
+    await ctx.info("Buscando termos contratuais do TCU...")
+    termos = await client.consultar_termos_contratuais()
+    await ctx.info(f"{len(termos)} termos encontrados no total")
+
+    # Filtrar
+    if ano:
+        termos = [t for t in termos if t.ano == ano]
+    if fornecedor:
+        termo_upper = fornecedor.upper()
+        termos = [t for t in termos if termo_upper in t.nome_fornecedor.upper()]
+
+    if not termos:
+        return "Nenhum termo contratual encontrado com os filtros informados."
+
+    await ctx.info(f"{len(termos)} termos após filtros")
+    termos_exibir = termos[:limite]
+
+    rows = [
+        (
+            f"{t.numero}/{t.ano}",
+            t.nome_fornecedor[:40],
+            t.objeto[:60] + "..." if len(t.objeto) > 60 else t.objeto,
+            format_brl(t.valor_atualizado),
+            t.modalidade_licitacao,
+        )
+        for t in termos_exibir
+    ]
+    header = f"Termos contratuais do TCU ({len(termos)} encontrados"
+    if ano:
+        header += f", ano: {ano}"
+    if fornecedor:
+        header += f", fornecedor: '{fornecedor}'"
+    header += f", exibindo {len(termos_exibir)}):\n\n"
+
+    return header + markdown_table(
+        ["Contrato", "Fornecedor", "Objeto", "Valor Atualizado", "Modalidade"],
+        rows,
+    )
+
+
+async def consultar_cadirreg(ctx: Context, cpf: str) -> str:
+    """Consulta pessoa no CADIRREG — Cadastro de Responsáveis com Contas Irregulares.
+
+    Verifica se uma pessoa (por CPF) possui contas julgadas irregulares pelo TCU.
+    Retorna vazio se o CPF não constar no cadastro.
+
+    Args:
+        cpf: CPF da pessoa (somente números, sem formatação).
+
+    Returns:
+        Dados do cadastro ou mensagem de não encontrado.
+    """
+    await ctx.info(f"Consultando CADIRREG para CPF {cpf}...")
+    registros = await client.consultar_cadirreg(cpf)
+    await ctx.info(f"{len(registros)} registro(s) encontrado(s)")
+
+    if not registros:
+        return f"CPF {cpf} não consta no CADIRREG (sem contas irregulares)."
+
+    rows = [
+        (
+            r.nome_responsavel,
+            r.num_cpf,
+            f"{r.num_processo}/{r.ano_processo}",
+            r.julgamento[:60] + "..." if len(r.julgamento) > 60 else r.julgamento,
+            r.se_detentor_cargo,
+        )
+        for r in registros
+    ]
+    return markdown_table(
+        ["Nome", "CPF", "Processo", "Julgamento", "Cargo Público"],
         rows,
     )

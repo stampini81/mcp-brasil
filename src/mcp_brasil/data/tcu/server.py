@@ -12,7 +12,10 @@ from .tools import (
     consultar_certidoes,
     consultar_inabilitados,
     consultar_inidoneos,
+    calcular_debito,
+    consultar_cadirreg,
     consultar_pedidos_congresso,
+    consultar_termos_contratuais,
 )
 
 mcp = FastMCP("mcp-brasil-tcu")
@@ -23,6 +26,9 @@ mcp.tool(consultar_inabilitados, tags={"consulta", "inabilitados", "funcao-publi
 mcp.tool(consultar_inidoneos, tags={"consulta", "inidoneos", "licitacoes"})
 mcp.tool(consultar_certidoes, tags={"consulta", "certidoes", "cnpj", "compliance"})
 mcp.tool(consultar_pedidos_congresso, tags={"consulta", "congresso", "pedidos"})
+mcp.tool(calcular_debito, tags={"calculo", "debito", "selic", "correcao"})
+mcp.tool(consultar_termos_contratuais, tags={"consulta", "contratos", "licitacoes"})
+mcp.tool(consultar_cadirreg, tags={"consulta", "cadirreg", "contas-irregulares"})
 
 # Resources
 mcp.resource("data://catalogo-endpoints", mime_type="application/json")(catalogo_endpoints)

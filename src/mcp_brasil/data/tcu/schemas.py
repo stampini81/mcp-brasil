@@ -109,3 +109,38 @@ class ResultadoDebito(BaseModel):
     saldo_total: float = Field(default=0.0, alias="saldoTotal")
 
     model_config = {"populate_by_name": True}
+
+
+class TermoContratual(BaseModel):
+    """Termo contratual firmado pelo TCU."""
+
+    numero: int = 0
+    ano: int = 0
+    tipo_contratacao: str = Field(default="", alias="tipoContratacao")
+    nome_fornecedor: str = Field(default="", alias="nomeFornecedor")
+    cnpj_fornecedor: str = Field(default="", alias="cnpjFornecedor")
+    objeto: str = ""
+    valor_inicial: float = Field(default=0.0, alias="valorInicial")
+    valor_atualizado: float = Field(default=0.0, alias="valorAtualizado")
+    data_assinatura: str = Field(default="", alias="dataAssinatura")
+    data_termino_vigencia: str = Field(default="", alias="dataTerminoVigencia")
+    modalidade_licitacao: str = Field(default="", alias="modalidadeLicitacao")
+    numero_processo: str = Field(default="", alias="numeroProcesso")
+    unidade_gestora: str = Field(default="", alias="unidadeGestora")
+
+    model_config = {"populate_by_name": True}
+
+
+class PessoaCadirreg(BaseModel):
+    """Pessoa com contas julgadas irregulares pelo TCU (CADIRREG)."""
+
+    nome_responsavel: str = Field(default="", alias="nomeResponsavel")
+    num_cpf: str = Field(default="", alias="numCPF")
+    num_processo: str = Field(default="", alias="numProcesso")
+    ano_processo: str = Field(default="", alias="anoProcesso")
+    julgamento: str = ""
+    unidade_tecnica_processo: str = Field(default="", alias="unidadeTecnicaProcesso")
+    se_detentor_cargo: str = Field(default="", alias="seDetentorCargoFuncaoPublica")
+    se_falecido: str = Field(default="", alias="seFalecido")
+
+    model_config = {"populate_by_name": True}

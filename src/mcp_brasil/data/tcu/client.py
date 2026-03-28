@@ -7,22 +7,37 @@ Endpoints:
     - Certidões APF: GET /certidoes/{cnpj}
     - Pedidos do Congresso: GET /scn/pedidos_congresso
     - Cálculo de Débito: POST /calculadora/calcular-saldos-debito
+    - Termos Contratuais: GET /termos-contratuais
+    - CADIRREG: GET /recuperapessoacadirreg/{cpf}
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from mcp_brasil._shared.http_client import http_get
+from mcp_brasil._shared.http_client import http_get, http_post
 
 from .constants import (
     ACORDAOS_URL,
     CERTIDOES_URL,
+    CALCULAR_DEBITO_URL,
     INABILITADOS_URL,
     INIDONEOS_URL,
+    CADIRREG_URL,
     PEDIDOS_CONGRESSO_URL,
+    TERMOS_CONTRATUAIS_URL,
 )
-from .schemas import Acordao, CertidaoConsolidada, Inabilitado, Inidoneo, PedidoCongresso
+from .schemas import (
+    Acordao,
+    CertidaoConsolidada,
+    Inabilitado,
+    Inidoneo,
+    ParcelaDebito,
+    PedidoCongresso,
+    PessoaCadirreg,
+    ResultadoDebito,
+    TermoContratual,
+)
 
 
 async def consultar_acordaos(
@@ -123,3 +138,56 @@ async def consultar_pedidos_congresso(
     data: dict[str, Any] = await http_get(url, params=params)
     items: list[dict[str, Any]] = data.get("items", [])
     return [PedidoCongresso(**item) for item in items]
+
+
+async def calcular_debito(
+    data_atualizacao: str,
+    parcelas: list[ParcelaDebito],
+    aplica_juros: bool = True,
+) -> ResultadoDebito:
+    """Calcula débito atualizado com correção monetária (SELIC) e juros.
+
+    API: POST https://divida.apps.tcu.gov.br/api/publico/calculadora/calcular-saldos-debito
+
+    Args:
+        data_atualizacao: Data de atualização (DD/MM/AAAA).
+        parcelas: Lista de parcelas do débito.
+        aplica_juros: Se deve aplicar juros de mora.
+    """
+    body: dict[str, Any] = {
+        "dataAtualizacao": data_atualizacao,
+        "aplicaJuros": aplica_juros,
+        "parcelasDebito": [
+            {
+                "dataFato": p.data_fato,
+                "indicativoDebitoCredito": p.indicativo,
+                "valorOriginal": p.valor_original,
+            }
+            for p in parcelas
+        ],
+    }
+    data: dict[str, Any] = await http_post(CALCULAR_DEBITO_URL, json_body=body)
+    return ResultadoDebito(**data)
+
+
+async def consultar_termos_contratuais() -> list[TermoContratual]:
+    """Fetch termos contratuais firmados pelo TCU.
+
+    API: GET https://contas.tcu.gov.br/contrata2RS/api/publico/termos-contratuais
+
+    Nota: Retorna TODOS os registros (sem paginação). ~3800+ registros.
+    """
+    data: list[dict[str, Any]] = await http_get(TERMOS_CONTRATUAIS_URL, timeout=60.0)
+    return [TermoContratual(**item) for item in data]
+
+
+async def consultar_cadirreg(cpf: str) -> list[PessoaCadirreg]:
+    """Fetch pessoa com contas irregulares no CADIRREG.
+
+    API: GET https://dados-abertos.apps.tcu.gov.br/api/recuperapessoacadirreg/{cpf}
+
+    Args:
+        cpf: CPF (somente números).
+    """
+    data: list[dict[str, Any]] = await http_get(f"{CADIRREG_URL}/{cpf}")
+    return [PessoaCadirreg(**item) for item in data]

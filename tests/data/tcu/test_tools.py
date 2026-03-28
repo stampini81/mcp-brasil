@@ -12,6 +12,9 @@ from mcp_brasil.data.tcu.schemas import (
     Inabilitado,
     Inidoneo,
     PedidoCongresso,
+    PessoaCadirreg,
+    ResultadoDebito,
+    TermoContratual,
 )
 
 CLIENT_MODULE = "mcp_brasil.data.tcu.client"
@@ -284,3 +287,129 @@ class TestConsultarPedidosCongresso:
         ):
             result = await tools.consultar_pedidos_congresso(ctx)
         assert "Nenhum pedido" in result
+
+
+class TestCalcularDebito:
+    @pytest.mark.asyncio
+    async def test_formats_result(self) -> None:
+        mock_data = ResultadoDebito(
+            data="22/03/2026",
+            saldoDebito=1000.0,
+            saldoVariacaoSelic=577.38,
+            saldoJuros=0.0,
+            saldoTotal=1577.38,
+        )
+        ctx = _mock_ctx()
+        with patch(
+            f"{CLIENT_MODULE}.calcular_debito",
+            new_callable=AsyncMock,
+            return_value=mock_data,
+        ):
+            result = await tools.calcular_debito(
+                ctx,
+                data_atualizacao="22/03/2026",
+                data_fato="01/01/2020",
+                valor_original=1000.0,
+            )
+        assert "R$ 1.000,00" in result
+        assert "R$ 577,38" in result
+        assert "R$ 1.577,38" in result
+        assert "01/01/2020" in result
+
+
+class TestConsultarTermosContratuais:
+    @pytest.mark.asyncio
+    async def test_formats_table(self) -> None:
+        mock_data = [
+            TermoContratual(
+                numero=1,
+                ano=2025,
+                tipoContratacao="CONTRATO",
+                nomeFornecedor="EMPRESA ABC LTDA",
+                cnpjFornecedor="12345678000100",
+                objeto="Prestação de serviços de TI",
+                valorInicial=100000.0,
+                valorAtualizado=120000.0,
+                dataAssinatura="2025-01-15T00:00:00-0300",
+                dataTerminoVigencia="2025-12-31T00:00:00-0300",
+                modalidadeLicitacao="PREGAO ELETRONICO",
+                numeroProcesso="001.000/2025-1",
+                unidadeGestora="STI",
+            ),
+        ]
+        ctx = _mock_ctx()
+        with patch(
+            f"{CLIENT_MODULE}.consultar_termos_contratuais",
+            new_callable=AsyncMock,
+            return_value=mock_data,
+        ):
+            result = await tools.consultar_termos_contratuais(ctx)
+        assert "EMPRESA ABC LTDA" in result
+        assert "R$ 120.000,00" in result
+
+    @pytest.mark.asyncio
+    async def test_filter_by_ano(self) -> None:
+        mock_data = [
+            TermoContratual(numero=1, ano=2025, nomeFornecedor="A", valorAtualizado=100.0),
+            TermoContratual(numero=2, ano=2024, nomeFornecedor="B", valorAtualizado=200.0),
+        ]
+        ctx = _mock_ctx()
+        with patch(
+            f"{CLIENT_MODULE}.consultar_termos_contratuais",
+            new_callable=AsyncMock,
+            return_value=mock_data,
+        ):
+            result = await tools.consultar_termos_contratuais(ctx, ano=2025)
+        assert "A" in result
+        assert "B" not in result
+
+    @pytest.mark.asyncio
+    async def test_empty_after_filter(self) -> None:
+        mock_data = [
+            TermoContratual(numero=1, ano=2025, nomeFornecedor="A", valorAtualizado=100.0),
+        ]
+        ctx = _mock_ctx()
+        with patch(
+            f"{CLIENT_MODULE}.consultar_termos_contratuais",
+            new_callable=AsyncMock,
+            return_value=mock_data,
+        ):
+            result = await tools.consultar_termos_contratuais(ctx, ano=2020)
+        assert "Nenhum termo" in result
+
+
+class TestConsultarCadirreg:
+    @pytest.mark.asyncio
+    async def test_formats_table(self) -> None:
+        mock_data = [
+            PessoaCadirreg(
+                nomeResponsavel="FULANO DE TAL",
+                numCPF="12345678900",
+                numProcesso="001",
+                anoProcesso="2020",
+                julgamento="Contas irregulares",
+                unidadeTecnicaProcesso="SECEX-PI",
+                seDetentorCargoFuncaoPublica="Sim",
+                seFalecido="Não",
+            ),
+        ]
+        ctx = _mock_ctx()
+        with patch(
+            f"{CLIENT_MODULE}.consultar_cadirreg",
+            new_callable=AsyncMock,
+            return_value=mock_data,
+        ):
+            result = await tools.consultar_cadirreg(ctx, cpf="12345678900")
+        assert "FULANO DE TAL" in result
+        assert "001/2020" in result
+
+    @pytest.mark.asyncio
+    async def test_not_found(self) -> None:
+        ctx = _mock_ctx()
+        with patch(
+            f"{CLIENT_MODULE}.consultar_cadirreg",
+            new_callable=AsyncMock,
+            return_value=[],
+        ):
+            result = await tools.consultar_cadirreg(ctx, cpf="00000000000")
+        assert "não consta" in result
