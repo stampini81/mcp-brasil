@@ -54,6 +54,8 @@ Crie `.vscode/mcp.json` na raiz do projeto:
 }
 ```
 
+Se voce quiser reutilizar o mcp-brasil em varios workspaces ou em projetos Salesforce, veja [Usando o mcp-brasil em projetos futuros](using-in-projects.md).
+
 ### Claude Code
 
 ```bash

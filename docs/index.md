@@ -32,6 +32,7 @@ O mcp-brasil e um pacote Python que expoe APIs publicas brasileiras como um serv
 | Pagina | Descricao |
 |--------|-----------|
 | [Quick Start](guide/quickstart.md) | Instalacao e configuracao em 2 minutos |
+| [Usando em Projetos](guide/using-in-projects.md) | Como reutilizar o MCP em projetos futuros, incluindo Salesforce |
 | [Arquitetura](concepts/architecture.md) | Como o projeto funciona por dentro |
 | [Catalogo de Features](reference/features.md) | Todas as 39 features e suas 309 tools |
 | [Smart Tools](reference/smart-tools.md) | Meta-tools: planner, batch, discovery |

@@ -243,6 +243,7 @@ META_ACCESS_TOKEN=seu-token
 | Página | Descrição |
 |--------|-----------|
 | [Quick Start](docs/guide/quickstart.md) | Instalação e configuração em 2 minutos |
+| [Usando em Projetos](docs/guide/using-in-projects.md) | Como reutilizar o MCP em projetos futuros, incluindo Salesforce |
 | [Arquitetura](docs/concepts/architecture.md) | Como o projeto funciona por dentro |
 | [Catálogo de Features](docs/reference/features.md) | Todas as 39 features e suas 309 tools |
 | [Smart Tools](docs/reference/smart-tools.md) | Meta-tools: planner, batch, discovery |
