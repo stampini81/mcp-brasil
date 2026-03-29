@@ -2,6 +2,18 @@
 
 Todas as mudanças notáveis do mcp-brasil estão documentadas neste arquivo.
 
+## [0.7.3] - 2026-03-29
+
+### Documentation
+
+- Update .env.example with META_ACCESS_TOKEN and current version
+- Update features catalog and README with 41 features and 326 tools
+- Remove showcase test file
+
+### Miscellaneous
+
+- Move showcase files to tests/
+
 ## [0.7.2] - 2026-03-28
 
 ### Documentation
