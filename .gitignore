@@ -26,4 +26,5 @@ AGENTS.md
 # IDE
 .idea/
 .vscode/
+.sfdx/
 *.swp
